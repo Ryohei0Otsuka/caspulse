@@ -6,13 +6,11 @@ import type {
   StoredComment,
   StreamMetric,
   TerminalEvent,
-  TrackedUser,
   TrackerUpdate,
 } from '../shared/types';
 
 const THUMBNAIL_REFRESH_MS = 20_000;
 const emptyDashboard: DashboardPayload = {
-  trackedUsers: [],
   auth: { connected: true, account: null, callbackUrl: '', secureStorageAvailable: true, appClientConfigured: true },
   tracker: { trackedUserId: null, isRunning: false, isLive: false, activeMovieId: null, lastCheckedAt: null, error: null },
   selectedUser: null,
@@ -99,8 +97,7 @@ export function App() {
         const nextComments = selected && update.newComments.length ? [...current.comments, ...update.newComments].filter((v,i,a)=>a.findIndex(x=>x.commentId===v.commentId)===i).slice(-600) : current.comments;
         const nextMetrics = selected && update.latestMetric ? [...current.metrics, update.latestMetric].slice(-180) : current.metrics;
         if (ttsEnabled && selected && update.newComments.length) speakComments(update.newComments, ttsIncludeName);
-        const users = update.trackedUser ? [update.trackedUser, ...current.trackedUsers.filter(u=>u.userId!==update.trackedUser?.userId)] : current.trackedUsers;
-        return { ...current, trackedUsers: users, selectedUser: selected && update.trackedUser ? update.trackedUser : current.selectedUser, tracker:update.tracker, liveMovie:selected ? update.liveMovie : current.liveMovie, comments:nextComments, metrics:nextMetrics };
+        return { ...current, selectedUser: selected && update.trackedUser ? update.trackedUser : current.selectedUser, tracker:update.tracker, liveMovie:selected ? update.liveMovie : current.liveMovie, comments:nextComments, metrics:nextMetrics };
       });
     });
     const offTerminal = window.caspulse.onTerminalEvent(e => setTerminal(current => [...current,e].slice(-500)));
@@ -130,7 +127,6 @@ export function App() {
 
   const run = async (fn:()=>Promise<void>) => { setBusy(true); setError(null); try { await fn(); } catch(e){ setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } };
   const handleTrace = (e:FormEvent) => { e.preventDefault(); void run(async()=>{ const r=await window.caspulse.startTrackingInput(targetInput); setDashboard(r.dashboard); setSelectedUserId(r.target.userId); setTargetInput(`https://twitcasting.tv/${r.target.screenId}`); }); };
-  const startRecent = (u:TrackedUser) => void run(async()=>{ setSelectedUserId(u.userId); setTargetInput(`https://twitcasting.tv/${u.screenId}`); await window.caspulse.startTrackingUser(u.userId); await refresh(u.userId); });
   const connectComment = () => void run(async()=>setCommentAuth(await window.caspulse.connectCommentAuth()));
   const disconnectComment = () => void run(async()=>setCommentAuth(await window.caspulse.disconnectCommentAuth()));
   const sendComment = async () => {
@@ -180,7 +176,6 @@ export function App() {
             <div><span>勢い</span><b>{latest?`${latest.momentum>=0?'+':''}${latest.momentum}%`:'—'}</b><small>{latest?momentumText(latest.momentum):'待機中'}</small></div>
             <div><span>盛り上がり</span><b>{latest?latest.activityScore:'—'}</b><small>{latest?activityText(latest.activityScore):'待機中'}</small></div>
           </div>
-          <article className="panel recent-panel"><div className="panel-head"><div><span>RECENT</span><h3>最近の配信</h3></div><small>{dashboard.trackedUsers.length}</small></div><div className="recent-list">{dashboard.trackedUsers.length?dashboard.trackedUsers.slice(0,7).map(u=><button key={u.userId} className={u.userId===selectedUserId?'selected':''} onClick={()=>startRecent(u)}><img src={u.image} alt=""/><span><b>{u.name}</b><small>@{u.screenId}</small></span></button>):<p className="empty-small">まだありません。</p>}</div></article>
         </aside>
 
         <section className="main-column">

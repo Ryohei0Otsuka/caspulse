@@ -1,10 +1,10 @@
-# CASPULSE UI Spec — v0.1.3
+# CASPULSE UI Spec — v0.3.0
 
 ## Core feeling
 
 Not an operations dashboard. Not an admin console.
 
-CASPULSE should feel like a small neon room sitting beside a TwitCasting stream.
+CASPULSE should feel like a compact neon comment viewer sitting beside a TwitCasting stream.
 
 Keywords:
 
@@ -12,47 +12,38 @@ Keywords:
 - neon
 - soft cyber
 - streamer culture
-- stickers / doodles
-- friendly terminal
-- dense but playful
+- compact
+- dense but readable
 
 ## Main layout
 
 ```text
 Header
-URL paste hero
+Compact URL / connection bar
 
 ┌──────────────┬────────────────────────────┬──────────────┐
-│ Live preview │ 4 vibe cards               │ Now feeling  │
-│              │                            │              │
-│ Comments     │ Live activity wave         │ Recent       │
-│              │                            │              │
-│              │ Waiwai terminal            │ Cozy panel   │
+│ Live preview │ Live comments              │ Now          │
+│ 4 metrics    │ Comment composer           │ Live log     │
+│              │ Activity graph             │              │
 └──────────────┴────────────────────────────┴──────────────┘
 ```
+
+The main screen does **not** show a recent-streams panel. Historical stream/comment data stays in local SQLite and can be surfaced later in a dedicated history view if needed.
 
 ## Copy rules
 
 Prefer:
 
-- 配信URLを入力
+- 配信URL
 - 視聴しに行く！
-- 見てる人
+- 視聴者
 - コメ / 分
 - 勢い
-- いまの盛り上がり
-- コメントながれ
-- いまこんな感じ
+- 盛り上がり
+- コメント
+- 配信の様子
 - ライブログ
-- 配信きた！
-- 次の配信まち
 
-Avoid normal-user UI terms such as:
+Avoid overly cute wording and normal-user technical jargon.
 
-- API status
-- event monitor
-- activity analytics
-- tracking status
-- client configuration
-
-Technical data belongs in developer disclosures or log details.
+Popness should come from color, glow, motion, and composition rather than cutesy copy.

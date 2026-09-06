@@ -112,7 +112,6 @@ export interface PostCommentResult {
 }
 
 export interface DashboardPayload {
-  trackedUsers: TrackedUser[];
   auth: AuthStatus;
   tracker: TrackerStatus;
   selectedUser: TrackedUser | null;
@@ -153,9 +152,7 @@ export interface CaspulseApi {
   disconnectCommentAuth: () => Promise<CommentAuthStatus>;
   postComment: (movieId: string, comment: string) => Promise<PostCommentResult>;
   startTrackingInput: (input: string) => Promise<StartTrackingResult>;
-  startTrackingUser: (userId: string) => Promise<TrackerStatus>;
   stopTracking: () => Promise<TrackerStatus>;
-  removeTrackedUser: (userId: string) => Promise<void>;
   getDashboard: (userId?: string) => Promise<DashboardPayload>;
   getClipboardTwitCastingTarget: () => Promise<string | null>;
   getLiveThumbnail: (userId: string) => Promise<string | null>;

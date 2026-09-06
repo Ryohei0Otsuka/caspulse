@@ -72,13 +72,12 @@ async function restoreCommentAuth() {
     }
 }
 function buildDashboard(userId) {
-    const trackedUsers = db.listTrackedUsers();
     const trackerUserId = tracker.getStatus().trackedUserId;
     const selectedUser = userId
         ? db.getTrackedUser(userId)
         : trackerUserId
             ? db.getTrackedUser(trackerUserId)
-            : trackedUsers[0] ?? null;
+            : null;
     let liveMovie = null;
     let metrics = [];
     let comments = [];
@@ -93,7 +92,6 @@ function buildDashboard(userId) {
         }
     }
     return {
-        trackedUsers,
         auth: relayStatus(),
         tracker: tracker.getStatus(),
         selectedUser,
@@ -208,21 +206,7 @@ function registerIpc() {
         await tracker.start(target);
         return { dashboard: buildDashboard(target.userId), target };
     });
-    electron_1.ipcMain.handle('tracker:start-user', async (_event, userId) => {
-        const stored = db.getTrackedUser(String(userId ?? ''));
-        if (!stored)
-            throw new Error('最近つないだ配信に対象ユーザーが見つかりません。');
-        const latestIdentity = await api.getUser(stored.userId);
-        const target = db.upsertTrackedUser(latestIdentity);
-        return tracker.start(target);
-    });
     electron_1.ipcMain.handle('tracker:stop', async () => tracker.stop());
-    electron_1.ipcMain.handle('tracked:remove', async (_event, userId) => {
-        const normalized = String(userId ?? '');
-        if (tracker.getStatus().trackedUserId === normalized)
-            tracker.stop();
-        db.removeTrackedUser(normalized);
-    });
     electron_1.ipcMain.handle('clipboard:get-twitcasting-target', async () => await clipboardTwitCastingTarget());
     electron_1.ipcMain.handle('thumbnail:get-live', async (_event, userId) => {
         const normalized = String(userId ?? '').trim();
