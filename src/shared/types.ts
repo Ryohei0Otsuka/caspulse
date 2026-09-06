@@ -99,6 +99,18 @@ export interface AuthStatus {
   appClientConfigured: boolean;
 }
 
+export interface CommentAuthStatus {
+  connected: boolean;
+  account: TwitCastingUser | null;
+  secureStorageAvailable: boolean;
+}
+
+export interface PostCommentResult {
+  movieId: string;
+  allCount: number;
+  comment: StoredComment | null;
+}
+
 export interface DashboardPayload {
   trackedUsers: TrackedUser[];
   auth: AuthStatus;
@@ -136,6 +148,10 @@ export interface StartTrackingResult {
 export interface CaspulseApi {
   getBootstrap: () => Promise<DashboardPayload>;
   getRelayStatus: () => Promise<{ ok: boolean; baseUrl: string }>;
+  getCommentAuthStatus: () => Promise<CommentAuthStatus>;
+  connectCommentAuth: () => Promise<CommentAuthStatus>;
+  disconnectCommentAuth: () => Promise<CommentAuthStatus>;
+  postComment: (movieId: string, comment: string) => Promise<PostCommentResult>;
   startTrackingInput: (input: string) => Promise<StartTrackingResult>;
   startTrackingUser: (userId: string) => Promise<TrackerStatus>;
   stopTracking: () => Promise<TrackerStatus>;

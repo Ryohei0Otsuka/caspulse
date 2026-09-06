@@ -9,7 +9,7 @@ Do not commit:
 - local SQLite files
 - recordings or private exports
 
-CASPULSE v0.1 does not require secrets in `.env`.
+CASPULSE v0.3 does not require TwitCasting secrets in the desktop repository.
 
 ## OAuth token storage
 

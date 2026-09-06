@@ -1,8 +1,8 @@
 {
   "name": "caspulse",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "private": true,
-  "description": "A playful portable TwitCasting companion: paste a stream URL and watch comments, viewers, and momentum locally.",
+  "description": "A compact portable TwitCasting companion with live comments, momentum, and optional in-app comment posting.",
   "author": "CASPULSE Project",
   "license": "MIT",
   "main": "dist-electron/main/main.js",

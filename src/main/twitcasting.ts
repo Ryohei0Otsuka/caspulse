@@ -17,10 +17,24 @@ interface CurrentLiveResponse {
   tags: string[];
 }
 
+interface VerifyCredentialsResponse {
+  user: TwitCastingUser;
+}
+
+interface OAuthConfigResponse {
+  client_id: string;
+}
+
 export interface CommentsResponse {
   movie_id: string;
   all_count: number;
   comments: TwitCastingComment[];
+}
+
+export interface PostCommentApiResponse {
+  movie_id: string;
+  all_count: number;
+  comment: TwitCastingComment;
 }
 
 export class TwitCastingApiError extends Error {
@@ -32,6 +46,18 @@ export class TwitCastingApiError extends Error {
     super(message);
     this.name = 'TwitCastingApiError';
   }
+}
+
+function friendlyApiMessage(status: number, code?: number, fallback?: string): string {
+  if (code === 2002) return 'この配信ではコメントが制限されています。';
+  if (code === 2003) return '同じコメントを続けて送ることはできません。';
+  if (code === 2004) return 'この配信ではこれ以上コメントを投稿できません。';
+  if (code === 2005) return 'コメント投稿の権限がありません。ツイキャス連携をやり直してください。';
+  if (code === 2006) return 'ツイキャス側でメールアドレス確認が必要です。';
+  if (status === 401) return 'ツイキャス連携の有効期限が切れています。もう一度連携してください。';
+  if (status === 403) return fallback || 'この操作はツイキャス側で許可されていません。';
+  if (status === 404) return fallback || '対象の配信が見つかりません。';
+  return fallback || `TwitCasting API error (${status})`;
 }
 
 export class TwitCastingClient {
@@ -58,6 +84,13 @@ export class TwitCastingClient {
     }
   }
 
+  async getOAuthClientId(): Promise<string> {
+    const response = await this.relayRequest<OAuthConfigResponse>('/api/oauth-config');
+    const clientId = String(response.client_id ?? '').trim();
+    if (!clientId) throw new Error('CASPULSEのコメント連携設定を取得できませんでした。');
+    return clientId;
+  }
+
   async getUser(userIdOrScreenId: string): Promise<TwitCastingUser> {
     const target = userIdOrScreenId.replace(/^@/, '').trim();
     const response = await this.relayRequest<UserResponse>(
@@ -77,8 +110,6 @@ export class TwitCastingClient {
     }
   }
 
-  // The official live-thumbnail endpoint is public, so the image can be fetched
-  // directly without exposing any CASPULSE secret.
   async getLiveThumbnailDataUrl(userId: string): Promise<string | null> {
     const id = encodeURIComponent(userId.trim());
     const response = await fetch(
@@ -97,6 +128,26 @@ export class TwitCastingClient {
     return this.relayRequest<CommentsResponse>(`/api/comments?${params.toString()}`);
   }
 
+  async verifyUserToken(accessToken: string): Promise<TwitCastingUser> {
+    const response = await this.bearerRequest<VerifyCredentialsResponse>(
+      '/verify_credentials',
+      accessToken,
+      { method: 'GET' },
+    );
+    return response.user;
+  }
+
+  async postComment(movieId: string, accessToken: string, comment: string): Promise<PostCommentApiResponse> {
+    return this.bearerRequest<PostCommentApiResponse>(
+      `/movies/${encodeURIComponent(movieId)}/comments`,
+      accessToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({ comment, sns: 'none' }),
+      },
+    );
+  }
+
   private async relayRequest<T>(path: string): Promise<T> {
     let response: Response;
     try {
@@ -105,7 +156,7 @@ export class TwitCastingClient {
       });
     } catch {
       throw new TwitCastingApiError(
-        'CASPULSE Relayに接続できません。ネット接続を確認して、もう一度お試しください。',
+        'CASPULSE Relayにつながりません。ネット接続を確認して、もう一度試してください。',
         0,
       );
     }
@@ -131,5 +182,42 @@ export class TwitCastingClient {
     }
 
     return await response.json() as T;
+  }
+
+  private async bearerRequest<T>(path: string, accessToken: string, init: RequestInit): Promise<T> {
+    let response: Response;
+    try {
+      response = await fetch(`${TWITCASTING_BASE_URL}${path}`, {
+        ...init,
+        headers: {
+          Accept: 'application/json',
+          'X-Api-Version': '2.0',
+          Authorization: `Bearer ${accessToken}`,
+          ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+          ...(init.headers ?? {}),
+        },
+      });
+    } catch {
+      throw new TwitCastingApiError('TwitCasting APIにつながりません。', 0);
+    }
+
+    let body: unknown = {};
+    try {
+      body = await response.json();
+    } catch {
+      // Keep empty body.
+    }
+
+    if (!response.ok) {
+      const apiError = (body as { error?: { code?: number; message?: string } })?.error;
+      const code = typeof apiError?.code === 'number' ? apiError.code : undefined;
+      throw new TwitCastingApiError(
+        friendlyApiMessage(response.status, code, apiError?.message),
+        response.status,
+        code,
+      );
+    }
+
+    return body as T;
   }
 }

@@ -81,7 +81,7 @@ export class TrackerService extends EventEmitter {
       lastCheckedAt: null,
       error: null,
     };
-    this.log('system', 'TRACE', `@${target.screenId} をおいかけるよ！`, `fixed uid:${target.userId}`);
+    this.log('system', 'TRACE', `@${target.screenId} の追跡を開始しました。`, `fixed uid:${target.userId}`);
     this.emitUpdate([], null);
 
     await this.pollStatus();
@@ -114,7 +114,7 @@ export class TrackerService extends EventEmitter {
     this.pollingStatus = false;
     this.pollingComments = false;
     if (logEvent && previousTarget) {
-      this.log('system', 'STOP', `@${previousTarget.screenId} はいったん休憩。`);
+      this.log('system', 'STOP', `@${previousTarget.screenId} の追跡を停止しました。`);
     }
     this.emitUpdate([], null);
     return this.getStatus();
@@ -259,19 +259,26 @@ export class TrackerService extends EventEmitter {
     const baseline15 = previous60 / 4;
     const previousMetric = this.db.getLatestMetric(movie.id);
     const viewerDelta = previousMetric ? movie.current_view_count - previousMetric.currentViewers : 0;
+    const previousViewers = previousMetric?.currentViewers ?? movie.current_view_count;
+    const viewerChangePercent = previousViewers > 0 ? (viewerDelta / previousViewers) * 100 : 0;
 
+    // Momentum v2: low-volume streams get a gentle ramp instead of +100% per comment.
     let momentum = 0;
-    if (baseline15 >= 0.5) {
-      momentum = ((recent15 - baseline15) / baseline15) * 100;
-    } else if (recent15 > 0) {
-      momentum = recent15 * 100;
+    if (previous60 < 4) {
+      if (recent15 === 1) momentum = 25;
+      else if (recent15 === 2) momentum = 50;
+      else if (recent15 >= 3) momentum = Math.min(150, 50 + (recent15 - 2) * 25);
+    } else {
+      const smoothedBaseline = Math.max(1, baseline15);
+      momentum = ((recent15 - smoothedBaseline) / smoothedBaseline) * 100;
     }
-    momentum = Math.max(-100, Math.min(999, Math.round(momentum)));
+    momentum = Math.max(-100, Math.min(400, Math.round(momentum)));
 
-    const commentScore = Math.min(45, commentsPerMinute * 1.8);
-    const uniqueScore = Math.min(25, uniqueCommenters * 3);
-    const viewerScore = Math.min(20, Math.max(0, viewerDelta) * 2.5);
-    const momentumScore = Math.min(10, Math.max(0, momentum) / 40);
+    // Activity v2: saturating scores reduce the tendency to hit 70+ too easily.
+    const commentScore = 45 * (1 - Math.exp(-commentsPerMinute / 22));
+    const uniqueScore = 20 * (1 - Math.exp(-uniqueCommenters / 7));
+    const viewerScore = Math.min(15, Math.max(0, viewerChangePercent) * 1.5);
+    const momentumScore = Math.min(20, Math.max(0, momentum) / 12.5);
     const activityScore = Math.max(0, Math.min(100, Math.round(
       commentScore + uniqueScore + viewerScore + momentumScore,
     )));
