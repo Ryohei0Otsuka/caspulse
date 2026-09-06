@@ -1,1 +1,1 @@
-Polish CASPULSE v0.1.3 with easy OAuth onboarding, live thumbnail fallback, and a more playful TwitCasting UI
+Add a private read-only TwitCasting API relay for CASPULSE anonymous viewer mode
