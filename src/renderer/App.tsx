@@ -25,11 +25,25 @@ function formatTime(epoch: number, seconds = false) {
 }
 function compact(value: number) { return new Intl.NumberFormat('ja-JP', { notation: 'compact', maximumFractionDigits: 1 }).format(value); }
 function cleanForSpeech(message: string) { return message.replace(/https?:\/\/\S+/gi, ' URL ').replace(/w{3,}/gi, ' わら ').slice(0, 180); }
-function speakComments(comments: StoredComment[], includeName: boolean) {
-  if (!('speechSynthesis' in window)) return;
-  for (const comment of comments.slice(-8)) {
-    const u = new SpeechSynthesisUtterance(includeName ? `${comment.name}。${cleanForSpeech(comment.message)}` : cleanForSpeech(comment.message));
-    u.lang = 'ja-JP'; u.rate = 1.08; window.speechSynthesis.speak(u);
+function speechSupported() { return 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window; }
+function cancelSpeech() { if (speechSupported()) window.speechSynthesis.cancel(); }
+function speakText(text: string, volume: number, rate: number) {
+  if (!speechSupported()) return false;
+  const synth = window.speechSynthesis;
+  if (synth.paused) synth.resume();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'ja-JP';
+  utterance.volume = Math.max(0, Math.min(1, volume));
+  utterance.rate = Math.max(0.5, Math.min(2, rate));
+  const voices = synth.getVoices();
+  const japaneseVoice = voices.find(voice => voice.lang.toLowerCase().startsWith('ja'));
+  if (japaneseVoice) utterance.voice = japaneseVoice;
+  synth.speak(utterance);
+  return true;
+}
+function speakComments(comments: StoredComment[], includeName: boolean, volume: number, rate: number) {
+  for (const comment of comments.slice(-5)) {
+    speakText(includeName ? `${comment.name}。${cleanForSpeech(comment.message)}` : cleanForSpeech(comment.message), volume, rate);
   }
 }
 function points(values: number[], width: number, height: number) {
@@ -44,7 +58,7 @@ function activityText(v: number) {
   if (v >= 80) return 'かなり活発'; if (v >= 60) return '盛り上がり中'; if (v >= 35) return 'いい流れ'; if (v >= 15) return '少し動きあり'; return '落ち着いています';
 }
 function friendlyLabel(label: string) {
-  return ({ INPUT:'入力', RESOLVE:'確認', TRACE:'追跡', LIVE:'LIVE', CHAT:'コメント', POST:'投稿', PULSE:'勢い', WAIT:'待機', END:'終了', STOP:'停止', IDENTITY:'ID更新', SYNC:'同期', AUTH:'連携', ERROR:'エラー', COMMENT:'コメント' } as Record<string,string>)[label] ?? label;
+  return ({ INPUT:'入力', RESOLVE:'確認', TRACE:'追跡', LIVE:'LIVE', CHAT:'コメント', POST:'投稿', PULSE:'勢い', WAIT:'待機', END:'終了', STOP:'切断', IDENTITY:'ID更新', SYNC:'同期', AUTH:'連携', ERROR:'エラー', COMMENT:'コメント' } as Record<string,string>)[label] ?? label;
 }
 
 function PulseChart({ metrics }: { metrics: StreamMetric[] }) {
@@ -76,8 +90,11 @@ export function App() {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [terminal, setTerminal] = useState<TerminalEvent[]>([]);
-  const [ttsEnabled, setTtsEnabled] = useState(false);
-  const [ttsIncludeName, setTtsIncludeName] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(() => localStorage.getItem('caspulse.tts.enabled') === 'true');
+  const [ttsIncludeName, setTtsIncludeName] = useState(() => localStorage.getItem('caspulse.tts.includeName') === 'true');
+  const [ttsVolume, setTtsVolume] = useState(() => Number(localStorage.getItem('caspulse.tts.volume') ?? '0.7'));
+  const [ttsRate, setTtsRate] = useState(() => Number(localStorage.getItem('caspulse.tts.rate') ?? '1.0'));
+  const ttsSettings = useRef({ enabled: ttsEnabled, includeName: ttsIncludeName, volume: ttsVolume, rate: ttsRate });
   const [relayOnline, setRelayOnline] = useState<boolean | null>(null);
   const [liveThumbnail, setLiveThumbnail] = useState<string | null>(null);
   const terminalEnd = useRef<HTMLDivElement | null>(null);
@@ -96,14 +113,27 @@ export function App() {
         const selected = current.selectedUser?.userId === update.tracker.trackedUserId;
         const nextComments = selected && update.newComments.length ? [...current.comments, ...update.newComments].filter((v,i,a)=>a.findIndex(x=>x.commentId===v.commentId)===i).slice(-600) : current.comments;
         const nextMetrics = selected && update.latestMetric ? [...current.metrics, update.latestMetric].slice(-180) : current.metrics;
-        if (ttsEnabled && selected && update.newComments.length) speakComments(update.newComments, ttsIncludeName);
+        const tts = ttsSettings.current;
+        if (tts.enabled && selected && update.newComments.length) speakComments(update.newComments, tts.includeName, tts.volume, tts.rate);
         return { ...current, selectedUser: selected && update.trackedUser ? update.trackedUser : current.selectedUser, tracker:update.tracker, liveMovie:selected ? update.liveMovie : current.liveMovie, comments:nextComments, metrics:nextMetrics };
       });
     });
     const offTerminal = window.caspulse.onTerminalEvent(e => setTerminal(current => [...current,e].slice(-500)));
     return () => { offTracker(); offTerminal(); };
-  }, [ttsEnabled, ttsIncludeName]);
+  }, []);
 
+  useEffect(() => {
+    const normalizedVolume = Number.isFinite(ttsVolume) ? Math.max(0, Math.min(1, ttsVolume)) : 0.7;
+    const normalizedRate = Number.isFinite(ttsRate) ? Math.max(0.7, Math.min(1.5, ttsRate)) : 1.0;
+    ttsSettings.current = { enabled: ttsEnabled, includeName: ttsIncludeName, volume: normalizedVolume, rate: normalizedRate };
+    localStorage.setItem('caspulse.tts.enabled', String(ttsEnabled));
+    localStorage.setItem('caspulse.tts.includeName', String(ttsIncludeName));
+    localStorage.setItem('caspulse.tts.volume', String(normalizedVolume));
+    localStorage.setItem('caspulse.tts.rate', String(normalizedRate));
+    if (!ttsEnabled) cancelSpeech();
+  }, [ttsEnabled, ttsIncludeName, ttsVolume, ttsRate]);
+
+  useEffect(() => () => cancelSpeech(), []);
   useEffect(() => { terminalEnd.current?.scrollIntoView({ block:'nearest' }); }, [terminal]);
   useEffect(() => { if (selectedUserId) void refresh(selectedUserId).catch(e=>setError(e instanceof Error ? e.message : String(e))); }, [selectedUserId]);
 
@@ -142,6 +172,23 @@ export function App() {
   };
   const onCommentKey = (e:KeyboardEvent<HTMLTextAreaElement>) => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); void sendComment(); } };
   const openStream = () => { const url=dashboard.liveMovie?.link || (selectedUser ? `https://twitcasting.tv/${selectedUser.screenId}` : null); if(url) void window.caspulse.openExternal(url.replace(/^http:/,'https:')); };
+  const toggleTts = (enabled: boolean) => {
+    setTtsEnabled(enabled);
+    if (!enabled) cancelSpeech();
+  };
+  const testTts = () => {
+    setError(null);
+    cancelSpeech();
+    if (!speakText('CASPULSE、読み上げテストです。', ttsVolume, ttsRate)) setError('この環境ではコメント読み上げを利用できません。');
+  };
+  const disconnectStream = () => void run(async()=>{
+    const tracker = await window.caspulse.stopTracking();
+    cancelSpeech();
+    setSelectedUserId(null);
+    setLiveThumbnail(null);
+    setCommentText('');
+    setDashboard(current=>({ ...emptyDashboard, auth: current.auth, tracker }));
+  });
 
   const atmosphere = useMemo(() => {
     if (!live) return dashboard.tracker.isRunning ? '現在はオフラインです。次の配信を待機しています。' : '配信URLを入力すると、コメントと盛り上がりを表示します。';
@@ -160,7 +207,7 @@ export function App() {
         <label>配信URL</label><input value={targetInput} onChange={e=>setTargetInput(e.target.value)} placeholder="https://twitcasting.tv/xxxxx" autoFocus={!dashboard.tracker.isRunning}/>
         <button type="button" className="ghost" onClick={()=>void run(async()=>{ const v=await window.caspulse.getClipboardTwitCastingTarget(); if(!v) throw new Error('クリップボードにツイキャスURLがありません。'); setTargetInput(v); })}>貼り付け</button>
         <button type="submit" className="primary" disabled={busy || !targetInput.trim()}>{dashboard.tracker.isRunning?'切り替える':'視聴しに行く！'}</button>
-        {dashboard.tracker.isRunning && <button type="button" className="stop" onClick={()=>void run(async()=>{await window.caspulse.stopTracking(); await refresh(selectedUserId??undefined);})}>停止</button>}
+        {dashboard.tracker.isRunning && <button type="button" className="stop" title="配信との接続を終了します" onClick={disconnectStream}>切断</button>}
       </form>
       {error && <div className="error-bar"><span>!</span>{error}<button onClick={()=>setError(null)}>×</button></div>}
 
@@ -180,7 +227,7 @@ export function App() {
 
         <section className="main-column">
           <article className="panel comments-panel">
-            <div className="panel-head comments-head"><div><span>LIVE COMMENTS</span><h3>コメント</h3></div><div className="comment-tools"><label><input type="checkbox" checked={ttsEnabled} onChange={e=>setTtsEnabled(e.target.checked)}/> 読み上げ</label><label><input type="checkbox" checked={ttsIncludeName} onChange={e=>setTtsIncludeName(e.target.checked)} disabled={!ttsEnabled}/> 名前</label></div></div>
+            <div className="panel-head comments-head"><div><span>LIVE COMMENTS</span><h3>コメント</h3></div><div className="comment-tools"><label className="tts-toggle"><input type="checkbox" checked={ttsEnabled} onChange={e=>toggleTts(e.target.checked)}/> コメント読み上げ</label><label className="tts-volume" title="読み上げ音量"><span>音量</span><input type="range" min="0" max="1" step="0.05" value={ttsVolume} onChange={e=>setTtsVolume(Number(e.target.value))} disabled={!ttsEnabled}/><b>{Math.round(ttsVolume*100)}%</b></label><label><input type="checkbox" checked={ttsIncludeName} onChange={e=>setTtsIncludeName(e.target.checked)} disabled={!ttsEnabled}/> 投稿者名も読む</label><button type="button" className="tts-test" onClick={testTts}>テスト</button></div></div>
             <div className="comments-scroll">{recentComments.length?recentComments.map(c=><div className="comment-row" key={c.commentId}><img src={c.image} alt=""/><time>{formatTime(c.createdAt)}</time><div><b>{c.name}</b><small>@{c.screenId}</small></div><p>{c.message}</p></div>):<div className="comments-empty">配信につながるとコメントがここに流れます。</div>}</div>
             <div className={`composer ${commentAuth.connected?'ready':''}`}>
               {!commentAuth.connected ? <><div className="composer-info"><b>CASPULSEからコメント</b><span>閲覧は匿名のまま。投稿するときだけツイキャス連携を使います。</span></div><button className="auth-button" onClick={connectComment} disabled={busy}>ツイキャス連携</button></> : <>
@@ -201,6 +248,8 @@ export function App() {
     {settingsOpen && <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setSettingsOpen(false)}}><section className="settings-modal"><div className="modal-head"><div><span>SETTINGS</span><h2>設定</h2></div><button onClick={()=>setSettingsOpen(false)}>×</button></div>
       <div className="setting-row"><div><b>Relay</b><span>匿名閲覧用の読み取り接続</span></div><strong>{relayOnline?'接続済み':'未接続'}</strong></div>
       <div className="setting-row"><div><b>コメント投稿</b><span>{commentAuth.connected?`@${commentAuth.account?.screen_id} で連携中`:'必要な人だけツイキャス連携'}</span></div>{commentAuth.connected?<button className="danger" onClick={disconnectComment}>解除</button>:<button onClick={connectComment}>連携する</button>}</div>
+      <div className="setting-row tts-setting-row"><div><b>コメント読み上げ</b><span>新しく届いたコメントをWindowsの音声で読み上げます</span></div><label className="setting-switch"><input type="checkbox" checked={ttsEnabled} onChange={e=>toggleTts(e.target.checked)}/><strong>{ttsEnabled?'ON':'OFF'}</strong></label></div>
+      <div className="setting-control"><label><span>音量</span><input type="range" min="0" max="1" step="0.05" value={ttsVolume} onChange={e=>setTtsVolume(Number(e.target.value))}/><b>{Math.round(ttsVolume*100)}%</b></label><label><span>速度</span><input type="range" min="0.7" max="1.5" step="0.05" value={ttsRate} onChange={e=>setTtsRate(Number(e.target.value))}/><b>{ttsRate.toFixed(2)}x</b></label><button type="button" onClick={testTts}>🔊 テスト再生</button></div>
       <div className="setting-row"><div><b>保存</b><span>コメント・推移はローカルSQLiteへ保存</span></div><strong>LOCAL</strong></div>
       <p className="setting-note">コメント投稿用アクセストークンは、利用可能な環境ではOSのsafeStorageで暗号化してローカル保存します。Relayには送信しません。</p>
     </section></div>}

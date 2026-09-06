@@ -3,3 +3,23 @@
 @media(max-width:1180px){.dense-grid{grid-template-columns:230px minmax(480px,1fr) 260px}.comment-row{grid-template-columns:26px 38px 92px minmax(0,1fr)}}
 @media(max-width:980px){.dense-grid{grid-template-columns:220px minmax(0,1fr)}.right-column{grid-column:1/-1;display:grid;grid-template-columns:1fr 1.2fr}.terminal-panel{min-height:260px}.terminal-scroll{height:210px}.connect-strip{grid-template-columns:1fr auto auto}.connect-strip label{display:none}}
 @media(max-width:760px){.workspace{width:calc(100% - 12px)}.brand-wrap p{display:none}.dense-grid{grid-template-columns:1fr}.left-column,.main-column,.right-column{grid-column:auto}.left-column{display:grid;grid-template-columns:1fr 1fr}.right-column{display:flex}.connect-strip,.connect-strip:not(.connected){grid-template-columns:1fr auto;padding:8px}.connect-strip .ghost{display:none}.connect-strip .stop{grid-column:2}.comment-row{grid-template-columns:26px 36px 82px minmax(0,1fr)}.comments-scroll{height:360px}}
+
+/* Beta 2: clearer TTS controls and explicit stream disconnect */
+.comment-tools{align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.comment-tools label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.comment-tools .tts-volume{gap:5px;padding-right:7px}
+.comment-tools .tts-volume span{color:#a3b4d3}
+.comment-tools .tts-volume input[type="range"]{width:66px;accent-color:#66e7ff}
+.comment-tools .tts-volume b{min-width:27px;text-align:right;font-size:7px;color:#dce8ff}
+.tts-test{height:23px;border:1px solid rgba(255,255,255,.08);border-radius:999px;background:rgba(255,255,255,.05);color:#b9cae7;padding:0 7px;font-size:7px;cursor:pointer}
+.tts-test:hover{background:rgba(255,255,255,.09);color:#fff}
+.setting-control{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;padding:10px 2px;border-bottom:1px solid rgba(255,255,255,.05)}
+.setting-control label{display:grid;grid-template-columns:auto minmax(80px,1fr) 42px;gap:7px;align-items:center;color:#8fa2c8;font-size:7px}
+.setting-control input[type="range"]{width:100%;accent-color:#65e6ff}
+.setting-control b{font-size:7px;color:#e8f1ff;text-align:right}
+.setting-control button{height:30px;border:0;border-radius:9px;background:rgba(255,255,255,.07);color:#dbe7ff;font-size:8px;font-weight:800;padding:0 10px;cursor:pointer;white-space:nowrap}
+.setting-control button:hover{background:rgba(255,255,255,.11)}
+@media(max-width:1180px){.comment-tools .tts-volume{display:none}}
+@media(max-width:760px){.comment-tools label:not(.tts-toggle),.comment-tools .tts-test{display:none}.setting-control{grid-template-columns:1fr}.setting-control label{grid-template-columns:34px 1fr 42px}}
+.setting-switch{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;cursor:pointer}
+.setting-switch input{accent-color:#65e6ff}

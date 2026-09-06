@@ -114,7 +114,7 @@ export class TrackerService extends EventEmitter {
     this.pollingStatus = false;
     this.pollingComments = false;
     if (logEvent && previousTarget) {
-      this.log('system', 'STOP', `@${previousTarget.screenId} の追跡を停止しました。`);
+      this.log('system', 'STOP', `@${previousTarget.screenId} との接続を終了しました。`);
     }
     this.emitUpdate([], null);
     return this.getStatus();

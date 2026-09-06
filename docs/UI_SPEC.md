@@ -1,4 +1,4 @@
-# CASPULSE UI Spec — v0.3.0
+# CASPULSE UI Spec — v0.3.0 Beta 2
 
 ## Core feeling
 
@@ -47,3 +47,17 @@ Prefer:
 Avoid overly cute wording and normal-user technical jargon.
 
 Popness should come from color, glow, motion, and composition rather than cutesy copy.
+
+
+## TTS / disconnect controls
+
+The comment header uses explicit wording:
+
+- コメント読み上げ
+- 音量
+- 投稿者名も読む
+- テスト
+
+Detailed TTS volume and speed controls are also available in Settings.
+
+While tracking a stream, the connection bar exposes **切断** rather than the ambiguous **停止**. Disconnect stops network polling and queued speech, clears the active view, and leaves saved SQLite history intact.
