@@ -5,10 +5,12 @@ node_modules/
 /dist/
 /dist-electron/
 /release/
+/CASPULSE-*.zip
 
 # secrets
 .env
 .env.*
+!.env.example
 
 # logs
 *.log
@@ -29,7 +31,6 @@ Thumbs.db
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+*.sqlite-journal
 recordings/
 exports/
-.env.local
-.env.*.local
