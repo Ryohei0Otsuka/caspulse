@@ -1,6 +1,36 @@
+# dependencies
+node_modules/
+
+# builds
+/dist/
+/dist-electron/
+/release/
+
+# secrets
 .env
 .env.*
 !.env.example
-.vercel
-node_modules
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor
 .DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# local CASPULSE data
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+recordings/
+exports/
+.env.local
+.env.*.local

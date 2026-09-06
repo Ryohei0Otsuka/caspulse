@@ -1,0 +1,18 @@
+CASPULSE recovery after accidentally pushing caspulse-relay into caspulse
+
+1. Close CASPULSE / npm dev server if running.
+2. Extract ALL files from this ZIP directly into:
+   C:\Users\Ryohei\Documents\GitHub\caspulse
+   Allow overwrite/replace when Windows asks.
+3. DO NOT delete the hidden .git folder in your repository.
+4. Open PowerShell in the caspulse folder and run:
+   powershell -ExecutionPolicy Bypass -File .\RESTORE_AFTER_WRONG_RELAY_PUSH.ps1
+5. Open GitHub Desktop and verify:
+   - api/ is deleted
+   - vercel.json is deleted
+   - package.json / README.md / src/ are restored to CASPULSE app files
+6. Commit with:
+   Restore CASPULSE app after accidental relay push
+7. Push origin.
+
+The relay belongs in the separate caspulse-relay repository.
