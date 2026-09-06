@@ -17,7 +17,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
-    "build:portable": "npm run build && electron-builder --win portable --x64"
+    "build:portable": "npm run build && electron-builder --win portable --x64 && npm run clean:portable-artifacts",
+    "clean:portable-artifacts": "powershell -NoProfile -Command \"Get-ChildItem -Path release -Exclude CASPULSE.exe -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue\""
   },
   "dependencies": {
     "react": "19.2.8",

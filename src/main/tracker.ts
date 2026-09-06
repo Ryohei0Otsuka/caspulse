@@ -141,9 +141,9 @@ export class TrackerService extends EventEmitter {
         this.sliceId = undefined;
 
         if (wasLive) {
-          this.log('wait', 'END', '配信おつかれさま！ 次の配信までここで待ってるよ。');
+          this.log('wait', 'END', '配信が終了しました。次の配信を待機します。');
         } else if (this.firstStatusCheck) {
-          this.log('wait', 'WAIT', 'いまはおやすみ中。次の配信が始まるまでのんびり待ってるよ。');
+          this.log('wait', 'WAIT', '現在はオフラインです。次の配信を待機します。');
         }
 
         this.firstStatusCheck = false;
@@ -160,8 +160,8 @@ export class TrackerService extends EventEmitter {
         this.log(
           'system',
           'IDENTITY',
-          `IDが変わったみたい。@${previousScreenId} → @${this.target.screenId}`,
-          `fixed uid:${this.target.userId} はそのまま`,
+          `screen_id を更新：@${previousScreenId} → @${this.target.screenId}`,
+          `fixed uid:${this.target.userId} unchanged`,
         );
       } else {
         this.target = this.db.upsertTrackedUser(current.broadcaster);
@@ -177,7 +177,7 @@ export class TrackerService extends EventEmitter {
         this.log(
           'live',
           'LIVE',
-          `配信きた！「${current.movie.title || `Movie #${current.movie.id}`}」につながったよ。`,
+          `配信開始：「${current.movie.title || `Movie #${current.movie.id}`}」に接続しました。`,
           `movie:${current.movie.id} · 見てる人:${current.movie.current_view_count}`,
         );
         await this.pollComments();
@@ -188,7 +188,7 @@ export class TrackerService extends EventEmitter {
       this.log(
         'pulse',
         'PULSE',
-        `いま ${metric.commentsPerMinute}コメ/分 · 勢い ${metric.momentum >= 0 ? '+' : ''}${metric.momentum}% · ノリ ${metric.activityScore}`,
+        `現在 ${metric.commentsPerMinute}コメ/分 · 勢い ${metric.momentum >= 0 ? '+' : ''}${metric.momentum}% · 盛り上がり ${metric.activityScore}`,
         `見てる人:${metric.currentViewers} (${metric.viewerDelta >= 0 ? '+' : ''}${metric.viewerDelta}) · 参加:${metric.uniqueCommenters}人`,
       );
       this.firstStatusCheck = false;
@@ -224,7 +224,7 @@ export class TrackerService extends EventEmitter {
       if (inserted.length > 0) {
         const lines = isInitialSync && inserted.length > 25 ? inserted.slice(-25) : inserted;
         if (isInitialSync && inserted.length > lines.length) {
-          this.log('system', 'SYNC', `${inserted.length}件のコメントを受け取ったよ。ここには最新${lines.length}件を流すね。`);
+          this.log('system', 'SYNC', `${inserted.length}件のコメントを取得。最新${lines.length}件を表示します。`);
         }
         for (const comment of lines) {
           this.log(

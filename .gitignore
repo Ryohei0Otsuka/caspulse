@@ -9,7 +9,6 @@ node_modules/
 # secrets
 .env
 .env.*
-!.env.example
 
 # logs
 *.log

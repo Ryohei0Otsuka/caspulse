@@ -540,7 +540,7 @@ button:focus-visible, input:focus-visible { box-shadow: 0 0 0 3px rgba(73, 232, 
 .metric-card.mint .metric-doodle { color: var(--mint); }
 
 .pulse-board::after {
-  content: "このへんで\Aぐっと来るかも！ ♡";
+  content: "この時間帯に\A動きが出るかも";
   white-space: pre;
   position: absolute;
   right: 18px;
@@ -576,7 +576,7 @@ button:focus-visible, input:focus-visible { box-shadow: 0 0 0 3px rgba(73, 232, 
   position: relative;
 }
 .mood-speech::after {
-  content: "配信の空気、ちらっ。";
+  content: "配信の流れを確認";
   position: absolute;
   right: 8px;
   top: -12px;

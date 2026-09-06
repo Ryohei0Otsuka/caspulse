@@ -78,7 +78,7 @@ class TwitCastingClient {
             });
         }
         catch {
-            throw new TwitCastingApiError('CASPULSE Relayにつながらないみたい。ネット接続を確認して、もう一度ためしてね。', 0);
+            throw new TwitCastingApiError('CASPULSE Relayに接続できません。ネット接続を確認して、もう一度お試しください。', 0);
         }
         if (!response.ok) {
             let message = `CASPULSE Relay error (${response.status})`;

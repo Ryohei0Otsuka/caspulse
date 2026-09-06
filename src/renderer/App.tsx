@@ -65,19 +65,19 @@ function compactNumber(value: number): string {
 }
 
 function vibeWord(value: number): string {
-  if (value >= 250) return '爆アガり';
-  if (value >= 100) return 'ぐんぐん';
-  if (value >= 35) return 'いい感じ';
-  if (value <= -50) return 'ひとやすみ';
-  return 'まったり';
+  if (value >= 250) return '急上昇';
+  if (value >= 100) return '上昇中';
+  if (value >= 35) return 'やや上向き';
+  if (value <= -50) return '落ち着き気味';
+  return '安定';
 }
 
 function activityWord(value: number): string {
-  if (value >= 85) return 'お祭りみたい！';
-  if (value >= 65) return 'かなりわいわい';
-  if (value >= 40) return 'いいノリ';
-  if (value >= 15) return 'じわじわきてる';
-  return 'のんびりタイム';
+  if (value >= 85) return 'かなり盛り上がっています';
+  if (value >= 65) return '盛り上がっています';
+  if (value >= 40) return 'いい流れです';
+  if (value >= 15) return '少し動きがあります';
+  return '落ち着いています';
 }
 
 function cleanForSpeech(message: string): string {
@@ -127,7 +127,7 @@ function MultiPulseChart({ metrics }: { metrics: StreamMetric[] }) {
     <article className="pulse-board sticker-card">
       <div className="pulse-board-head">
         <div>
-          <div className="section-kicker">〰 みんなの声が、波になる。</div>
+          <div className="section-kicker">〰 コメントと視聴者の流れ</div>
           <h2>いまの盛り上がり</h2>
         </div>
         <div className="chart-legend">
@@ -140,8 +140,8 @@ function MultiPulseChart({ metrics }: { metrics: StreamMetric[] }) {
       {last.length < 2 ? (
         <div className="pulse-empty">
           <div className="empty-wave">⌁⌁⌁</div>
-          <strong>まだ波はしずか。</strong>
-          <span>配信につながると、ここにコメントと視聴者の波が出てくるよ。</span>
+          <strong>まだデータがありません。</strong>
+          <span>配信につながると、コメントと視聴者の推移を表示します。</span>
         </div>
       ) : (
         <div className="pulse-chart-wrap">
@@ -166,17 +166,17 @@ function MultiPulseChart({ metrics }: { metrics: StreamMetric[] }) {
           </svg>
           {peak && (
             <div className="chart-bubble peak-bubble">
-              <b>このへん、わいわい！</b>
-              <span>ノリ {peak.activityScore}</span>
+              <b>この時間帯がピーク</b>
+              <span>盛り上がり {peak.activityScore}</span>
             </div>
           )}
           {latest && latest.momentum >= 100 && (
             <div className="chart-bubble now-bubble">
-              <b>いま伸びてる！</b>
+              <b>現在上昇中</b>
               <span>勢い +{latest.momentum}%</span>
             </div>
           )}
-          <div className="chart-doodle">みんなの声が<br />波になる！♡</div>
+          <div className="chart-doodle">コメントの動きを<br />ひと目で確認</div>
         </div>
       )}
     </article>
@@ -186,51 +186,51 @@ function MultiPulseChart({ metrics }: { metrics: StreamMetric[] }) {
 function atmosphereLines(metric: StreamMetric | null, isLive: boolean): Array<{ icon: string; text: string }> {
   if (!isLive) {
     return [
-      { icon: '🌙', text: 'いまは配信待ち。次の配信をのんびり待ってるよ。' },
-      { icon: '🔗', text: '一度つないだ人は、固定IDで次回も追いかける。' },
-      { icon: '💾', text: 'コメントや波の記録は、このPCの中に保存。' },
+      { icon: '🌙', text: '現在はオフラインです。次の配信を待機しています。' },
+      { icon: '🔗', text: '一度登録した配信者は固定IDで追跡します。' },
+      { icon: '💾', text: 'コメントと推移データはこのPCに保存します。' },
     ];
   }
   if (!metric) {
     return [
-      { icon: '📡', text: '配信につながった！ いま空気を見ているところ。' },
-      { icon: '💬', text: 'コメントが流れ始めると、ここもだんだん賑やかになるよ。' },
+      { icon: '📡', text: '配信に接続しました。データを取得しています。' },
+      { icon: '💬', text: 'コメントが届くと、ここに現在の傾向を表示します。' },
     ];
   }
 
   const lines: Array<{ icon: string; text: string }> = [];
-  if (metric.commentsPerMinute >= 30) lines.push({ icon: '💬', text: `コメント多め！ いま ${metric.commentsPerMinute} コメ/分。` });
-  else if (metric.commentsPerMinute > 0) lines.push({ icon: '☁️', text: `コメントは ${metric.commentsPerMinute} コメ/分。まったり流れてる。` });
-  else lines.push({ icon: '🍵', text: 'コメントはひと休み中。静かな時間も配信のうち。' });
+  if (metric.commentsPerMinute >= 30) lines.push({ icon: '💬', text: `コメントが活発です。現在 ${metric.commentsPerMinute} コメ/分。` });
+  else if (metric.commentsPerMinute > 0) lines.push({ icon: '☁️', text: `コメントは現在 ${metric.commentsPerMinute} コメ/分です。` });
+  else lines.push({ icon: '🍵', text: '現在、コメントの動きはありません。' });
 
-  if (metric.viewerDelta > 0) lines.push({ icon: '👀', text: `見てる人が増えてる。直近で +${metric.viewerDelta} 人。` });
-  else if (metric.viewerDelta < 0) lines.push({ icon: '🌿', text: '見てる人数はいま少し落ち着き気味。' });
-  else lines.push({ icon: '✨', text: '見てる人数はだいたいキープ中。' });
+  if (metric.viewerDelta > 0) lines.push({ icon: '👀', text: `視聴者が直近で +${metric.viewerDelta} 人増えています。` });
+  else if (metric.viewerDelta < 0) lines.push({ icon: '🌿', text: '視聴者数は直近でやや減少しています。' });
+  else lines.push({ icon: '✨', text: '視聴者数はおおむね横ばいです。' });
 
-  if (metric.momentum >= 100) lines.push({ icon: '🔥', text: 'コメントの勢いが一気に上向き！ 何か起きてるかも。' });
-  else if (metric.momentum >= 25) lines.push({ icon: '📈', text: 'じわっと盛り上がってきてる。' });
-  else if (metric.momentum <= -50) lines.push({ icon: '🫧', text: 'さっきより少し静か。次の波待ち。' });
-  else lines.push({ icon: '💜', text: 'ノリは安定。みんなでゆるっと見てる感じ。' });
+  if (metric.momentum >= 100) lines.push({ icon: '🔥', text: 'コメントの勢いが大きく上昇しています。' });
+  else if (metric.momentum >= 25) lines.push({ icon: '📈', text: 'コメントの勢いが上向いています。' });
+  else if (metric.momentum <= -50) lines.push({ icon: '🫧', text: 'コメントの勢いは直前より落ち着いています。' });
+  else lines.push({ icon: '💜', text: 'コメントの勢いは安定しています。' });
 
   return lines.slice(0, 4);
 }
 
 function friendlyLabel(label: string): string {
   const map: Record<string, string> = {
-    AUTH: 'つないだ',
-    INPUT: 'ぺたっ',
-    RESOLVE: 'みつけた',
-    TRACE: 'おいかけ',
-    LIVE: '配信きた！',
-    CHAT: 'コメ',
-    PULSE: 'ノリ',
-    WAIT: 'まち',
-    END: 'おつかれ',
+    AUTH: '接続',
+    INPUT: '入力',
+    RESOLVE: '確認',
+    TRACE: '追跡',
+    LIVE: 'LIVE',
+    CHAT: 'コメント',
+    PULSE: '勢い',
+    WAIT: '待機',
+    END: '終了',
     STOP: 'ストップ',
     IDENTITY: 'ID更新',
     SYNC: 'まとめて',
-    ERROR: 'あれ？',
-    COMMENT: 'コメ？',
+    ERROR: 'エラー',
+    COMMENT: 'コメント',
   };
   return map[label] ?? label.toLowerCase();
 }
@@ -397,7 +397,7 @@ export function App() {
     void runAction(async () => {
       const candidate = await window.caspulse.getClipboardTwitCastingTarget();
       if (!candidate) {
-        throw new Error('クリップボードにツイキャスの配信URLが見つからなかったよ。先に配信ページのURLをコピーしてね。');
+        throw new Error('クリップボードにツイキャスの配信URLが見つかりません。先に配信ページのURLをコピーしてください。');
       }
       setTargetInput(candidate);
       setClipboardCandidate(null);
@@ -439,16 +439,16 @@ export function App() {
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
       <div className="ambient ambient-three" />
-      <div className="sparkles" aria-hidden="true">✦　·　♡　✧　·　✦</div>
+      <div className="sparkles" aria-hidden="true">✦　·　⌁　✧　·　✦</div>
 
       <header className="topbar">
         <div className="brand-wrap">
           <img className="brand-icon" src="./assets/caspulse-icon.png" alt="CASPULSE" />
           <div className="brand-copy">
             <div className="brand-line"><h1>CASPULSE</h1><span className="heartbeat">⌁</span></div>
-            <p>ツイキャスの“いま”を、いっしょに楽しもう。</p>
+            <p>ツイキャスの“いま”を、見やすく楽しく。</p>
           </div>
-          <div className="brand-sticker">すきな配信、<br /><b>もっとたのしく。♡</b></div>
+          <div className="brand-sticker">配信の流れを、<br /><b>ひと目で。</b></div>
         </div>
 
         <nav className="nav-tabs" aria-label="CASPULSE navigation">
@@ -458,8 +458,8 @@ export function App() {
         </nav>
 
         <div className="top-message">
-          <span>好きな配信が、</span>
-          <b>もっと好きになる。♡</b>
+          <span>配信の流れを、</span>
+          <b>ひと目で見やすく。</b>
           <small className={relayOnline ? 'connected' : ''}>
             {relayOnline === null ? '○ Relayを確認中…' : relayOnline ? '● URLを貼るだけでOK' : '○ Relayにつながらない'}
           </small>
@@ -470,7 +470,7 @@ export function App() {
         <section className={`hero-wrap ${!dashboard.tracker.isRunning ? 'start-here' : ''}`}>
           {!dashboard.tracker.isRunning && (
             <div className="start-guide" aria-label="CASPULSEの使い方">
-              <div className="start-guide-title"><span>START</span><b>まずはここ！ 配信URLを貼ってね 👇</b></div>
+              <div className="start-guide-title"><span>START</span><b>ツイキャスの配信URLを貼ってスタート</b></div>
               <div className="start-steps">
                 <span><i>1</i> ツイキャスで見たい配信を開く</span>
                 <em>→</em>
@@ -481,7 +481,7 @@ export function App() {
             </div>
           )}
           <form className="url-hero" onSubmit={handleTrace}>
-            <div className="url-label">🔗 <b>ここに配信URLを貼ってね</b><span> ฅ^•ﻌ•^ฅ</span><small>例：twitcasting.tv/○○○</small></div>
+            <div className="url-label">🔗 <b>ツイキャスの配信URL</b><small>例：twitcasting.tv/○○○</small></div>
             <div className="url-input-shell">
               <span className="link-mark">↗</span>
               <input
@@ -506,20 +506,20 @@ export function App() {
               </button>
             ) : (
               <button type="submit" className="peek-button" disabled={busy || !targetInput.trim()}>
-                <span className="peek-cat">ฅ</span>
-                <span>{busy ? 'つないでる…' : 'のぞきにいく！'}</span>
+                <span className="peek-cat">▶</span>
+                <span>{busy ? '接続中…' : '視聴しに行く！'}</span>
                 <i>✦</i>
               </button>
             )}
           </form>
-          {!dashboard.tracker.isRunning && <div className="hero-note">この白い欄だよ！<br /><b>URLをぺたっ ✦</b><span>↙</span></div>}
+          {!dashboard.tracker.isRunning && <div className="hero-note">配信URLはここへ<br /><b>貼り付けて開始 ✦</b><span>↙</span></div>}
         </section>
 
         <div className="vibe-ribbon" aria-hidden="true">
           <span>✦ コメントが流れる</span>
-          <span>♡ 配信の波が見える</span>
+          <span>⌁ 配信の流れが見える</span>
           <span>⌁ 盛り上がりをあとから振り返れる</span>
-          <i>CASPULSEは、配信の横に置く小さな相棒。</i>
+          <i>CASPULSEは、配信の流れを見やすくするローカルビューア。</i>
         </div>
 
         {clipboardCandidate && !targetInput && (
@@ -527,14 +527,14 @@ export function App() {
             setTargetInput(clipboardCandidate);
             setClipboardCandidate(null);
           }}>
-            <span>📎</span><div><b>ツイキャスのURLみつけた！</b><small>クリップボードから入れる</small></div><em>これを見る →</em>
+            <span>📎</span><div><b>ツイキャスURLを検出</b><small>クリップボードから貼り付け</small></div><em>入力する →</em>
           </button>
         )}
 
         {error && (
           <div className="error-banner">
-            <span className="error-face">( ; ᯅ ; )</span>
-            <div><b>うまくつながらなかった。</b><span>{error}</span></div>
+            <span className="error-face">!</span>
+            <div><b>接続できませんでした。</b><span>{error}</span></div>
             <button type="button" onClick={() => setError(null)}>×</button>
           </div>
         )}
@@ -543,7 +543,7 @@ export function App() {
           <aside className="left-rail">
             <article className={`stream-card sticker-card ${live ? 'is-live' : ''}`}>
               <div className="stream-card-head">
-                <span className="live-badge">{live ? '● ただいま配信中！' : dashboard.tracker.isRunning ? '☾ 次の配信まち' : '☆ まだつないでないよ'}</span>
+                <span className="live-badge">{live ? '● 配信中' : dashboard.tracker.isRunning ? '☾ 配信待機中' : '☆ 未接続'}</span>
                 <time>{live && dashboard.liveMovie ? durationText(dashboard.liveMovie.duration) : '--:--:--'}</time>
               </div>
               <div className="stream-visual">
@@ -552,22 +552,22 @@ export function App() {
                     <img src={liveThumbnail} alt={`${selectedUser?.name ?? ''}の配信サムネイル`} />
                     <div className="thumbnail-shine" />
                     <span className="thumbnail-live">LIVE</span>
-                    <span className="thumbnail-note">いま、この瞬間。<br />ちゃんとここに。♡</span><span className="thumbnail-sticker">LIVE NOW ✦</span>
+                    <span className="thumbnail-note">現在の配信サムネイル</span><span className="thumbnail-sticker">LIVE NOW ✦</span>
                   </>
                 ) : selectedUser?.image ? (
                   <div className="offline-portrait">
                     <img src={selectedUser.image} alt="" />
-                    <div><span>また配信きたら</span><b>ここが動き出すよ。♡</b></div>
+                    <div><span>現在はオフライン</span><b>配信開始を待機中</b></div>
                   </div>
                 ) : (
                   <div className="empty-stream-art">
                     <img src="./assets/caspulse-icon.png" alt="" />
-                    <b>配信をつないでみよう</b>
-                    <span>URLを上にぺたっと貼るだけ。</span>
+                    <b>配信URLを入力してください</b>
+                    <span>上の入力欄にツイキャスURLを貼り付けます。</span>
                   </div>
                 )}
               </div>
-              <div className="stream-title">{dashboard.liveMovie?.title || (selectedUser ? `${selectedUser.name} の次の配信を待ってるよ` : '好きな配信を、ここに。')}</div>
+              <div className="stream-title">{dashboard.liveMovie?.title || (selectedUser ? `${selectedUser.name} の次の配信を待機中` : '配信URLを入力してください')}</div>
               <div className="stream-person">
                 {selectedUser ? (
                   <>
@@ -575,12 +575,12 @@ export function App() {
                     <div><b>{selectedUser.name}</b><span>@{selectedUser.screenId}</span></div>
                     <button type="button" onClick={openStream} title="ツイキャスで開く">↗</button>
                   </>
-                ) : <div className="no-person">まだ誰もおいかけてないよ。</div>}
+                ) : <div className="no-person">追跡中の配信者はいません。</div>}
               </div>
               {selectedUser && (
                 <div className="stream-tags">
                   <span>{live ? '配信中' : '待機中'}</span>
-                  <span>固定IDでおいかけ</span>
+                  <span>固定IDで追跡</span>
                   {dashboard.liveMovie?.subtitle && <span>{dashboard.liveMovie.subtitle}</span>}
                 </div>
               )}
@@ -588,12 +588,12 @@ export function App() {
 
             <article className="comments-card sticker-card">
               <div className="card-title-row">
-                <div><span className="section-kicker">みんなの声、ながれてく。</span><h3>💬 コメントながれ</h3></div>
-                <span>{dashboard.comments.length ? `${dashboard.comments.length}件` : 'まだ静か'}</span>
+                <div><span className="section-kicker">リアルタイムコメント</span><h3>💬 コメント</h3></div>
+                <span>{dashboard.comments.length ? `${dashboard.comments.length}件` : '待機中'}</span>
               </div>
               <div className="comment-list">
                 {recentComments.length === 0 ? (
-                  <div className="comments-empty"><span>☁</span><b>コメント待ち。</b><small>配信につながると、ここにふわっと流れてくるよ。</small></div>
+                  <div className="comments-empty"><span>☁</span><b>コメント待機中</b><small>配信につながると、ここにコメントを表示します。</small></div>
                 ) : recentComments.map((comment) => (
                   <div className="comment-row" key={comment.commentId}>
                     <img src={comment.image} alt="" />
@@ -603,7 +603,7 @@ export function App() {
                   </div>
                 ))}
               </div>
-              <div className="comment-footnote">たくさんの「すき」が、ここに流れる。♡</div>
+              <div className="comment-footnote">コメントは時系列で表示されます。</div>
             </article>
           </aside>
 
@@ -613,25 +613,25 @@ export function App() {
                 <div className="metric-icon">👥</div>
                 <div><span>見てる人</span><strong>{latestMetric ? compactNumber(latestMetric.currentViewers) : '—'}</strong></div>
                 <small>{latestMetric ? `${latestMetric.viewerDelta >= 0 ? '↑ +' : '↓ '}${latestMetric.viewerDelta} / 10秒` : 'つながると見えるよ'}</small>
-                <em>{latestMetric?.viewerDelta && latestMetric.viewerDelta > 0 ? 'わーい！' : 'ちらっ'}</em><i className="metric-doodle">✦</i>
+                <em>{latestMetric?.viewerDelta && latestMetric.viewerDelta > 0 ? 'UP' : 'LIVE'}</em><i className="metric-doodle">✦</i>
               </article>
               <article className="metric-card pink sticker-card">
                 <div className="metric-icon">💬</div>
                 <div><span>コメ / 分</span><strong>{latestMetric ? latestMetric.commentsPerMinute : '—'}</strong></div>
                 <small>{latestMetric ? `${latestMetric.uniqueCommenters}人が参加中` : 'コメントの流れ'}</small>
-                <em>{latestMetric && latestMetric.commentsPerMinute >= 20 ? 'コメ多い！' : 'ゆるゆる'}</em><i className="metric-doodle">♡</i>
+                <em>{latestMetric && latestMetric.commentsPerMinute >= 20 ? 'ACTIVE' : 'STEADY'}</em><i className="metric-doodle">●</i>
               </article>
               <article className="metric-card yellow sticker-card">
                 <div className="metric-icon">🔥</div>
                 <div><span>勢い</span><strong>{latestMetric ? `${latestMetric.momentum >= 0 ? '+' : ''}${latestMetric.momentum}%` : '—'}</strong></div>
                 <small>{latestMetric ? vibeWord(latestMetric.momentum) : '次の波は？'}</small>
-                <em>{latestMetric && latestMetric.momentum >= 100 ? 'きてる！' : 'ふわっ'}</em><i className="metric-doodle">↗</i>
+                <em>{latestMetric && latestMetric.momentum >= 100 ? 'RISING' : 'STABLE'}</em><i className="metric-doodle">↗</i>
               </article>
               <article className="metric-card mint sticker-card">
                 <div className="metric-icon">📡</div>
-                <div><span>いま</span><strong>{live ? '配信中！' : dashboard.tracker.isRunning ? '待ってる' : 'READY'}</strong></div>
-                <small>{live ? 'みんなでわいわい中！' : dashboard.tracker.isRunning ? '次の配信を見守り中' : 'URLぺたっで開始'}</small>
-                <em>{live ? '♡' : 'zzz'}</em><i className="metric-doodle">⌁</i>
+                <div><span>いま</span><strong>{live ? '配信中' : dashboard.tracker.isRunning ? '待機中' : 'READY'}</strong></div>
+                <small>{live ? 'ライブデータ取得中' : dashboard.tracker.isRunning ? '次の配信を待機中' : 'URL入力で開始'}</small>
+                <em>{live ? 'LIVE' : '—'}</em><i className="metric-doodle">⌁</i>
               </article>
             </div>
 
@@ -641,22 +641,22 @@ export function App() {
               <div className="terminal-head">
                 <div className="terminal-title">
                   <span className="terminal-prompt">&gt;_</span>
-                  <div><h3>わいわいログ</h3><small>配信の“いま”が、ここに流れる。</small></div>
+                  <div><h3>ライブログ</h3><small>配信イベントとコメントを時系列で表示。</small></div>
                 </div>
                 <div className="terminal-switches">
                   <label><input type="checkbox" checked={ttsEnabled} onChange={(event) => setTtsEnabled(event.target.checked)} /> 読み上げ</label>
                   <label><input type="checkbox" checked={ttsIncludeName} onChange={(event) => setTtsIncludeName(event.target.checked)} disabled={!ttsEnabled} /> 名前も</label>
-                  <label><input type="checkbox" checked={autoScroll} onChange={(event) => setAutoScroll(event.target.checked)} /> ついてく</label>
+                  <label><input type="checkbox" checked={autoScroll} onChange={(event) => setAutoScroll(event.target.checked)} /> 自動スクロール</label>
                 </div>
               </div>
               <div className="terminal-tools">
-                <span>ฅ 配信をいっしょに見てるよ。</span>
-                <input value={terminalFilter} onChange={(event) => setTerminalFilter(event.target.value)} placeholder="ログをさがす…" />
-                <button type="button" onClick={() => setTerminal([])}>おそうじ</button>
+                <span>配信ログをリアルタイム表示</span>
+                <input value={terminalFilter} onChange={(event) => setTerminalFilter(event.target.value)} placeholder="ログを検索…" />
+                <button type="button" onClick={() => setTerminal([])}>クリア</button>
               </div>
               <div className="terminal-body">
                 {filteredTerminal.length === 0 && (
-                  <div className="terminal-placeholder"><b>CASPULSE&gt;</b> ここはまだ静か。<br /><span>URLをぺたっとして「のぞきにいく！」を押してみてね。</span></div>
+                  <div className="terminal-placeholder"><b>CASPULSE&gt;</b> 接続待機中。<br /><span>配信URLを入力して「視聴しに行く！」を押してください。</span></div>
                 )}
                 {filteredTerminal.map((line) => (
                   <div className={`terminal-line kind-${line.kind}`} key={line.id}>
@@ -668,35 +668,35 @@ export function App() {
                 ))}
                 <div ref={terminalEndRef} />
               </div>
-              <div className="terminal-doodle">いっしょに<br />みてるよ！♡ <span>ᓚᘏᗢ</span></div>
+              <div className="terminal-doodle">LIVE<br />PULSE <span>⌁</span></div>
             </article>
           </section>
 
           <aside className="right-rail">
             <article className="mood-card sticker-card">
               <div className="card-title-row mood-title">
-                <div><span className="section-kicker">数字から、そっと。</span><h3>✦ いまこんな感じ</h3></div>
-                <span className="beta-pill">そっと観測中</span>
+                <div><span className="section-kicker">現在のデータから</span><h3>✦ 配信の様子</h3></div>
+                <span className="beta-pill">BETA</span>
               </div>
               <div className="mood-speech">
                 <img src="./assets/caspulse-icon.png" alt="" />
                 <p>{live && latestMetric
-                  ? `${activityWord(latestMetric.activityScore)}。いまの配信の空気を見てるよ。`
+                  ? `${activityWord(latestMetric.activityScore)}。現在の配信状況です。`
                   : dashboard.tracker.isRunning
-                    ? '次の配信を待ちながら、ここで見守ってるよ。'
-                    : '配信をつなぐと、ここの空気も動き出すよ。'}</p>
+                    ? '現在はオフラインです。次の配信を待機しています。'
+                    : '配信に接続すると、現在の傾向を表示します。'}</p>
               </div>
               <div className="mood-lines">
                 {atmosphere.map((line, index) => <div key={`${line.icon}-${index}`}><span>{line.icon}</span><p>{line.text}</p></div>)}
               </div>
-              <div className="mood-note">いまは数字からそっと見てるだけ。AIで文脈まで読めるようになるのは、もう少し先。♡</div>
+              <div className="mood-note">現在は数値ベースの表示です。文脈サマリーは今後追加予定です。</div>
             </article>
 
             <article className="recent-card sticker-card">
-              <div className="card-title-row"><h3>🐾 最近つないだ配信</h3><span>{dashboard.trackedUsers.length}</span></div>
+              <div className="card-title-row"><h3>◷ 最近つないだ配信</h3><span>{dashboard.trackedUsers.length}</span></div>
               <div className="recent-list">
                 {dashboard.trackedUsers.length === 0 ? (
-                  <div className="recent-empty">まだないよ。最初のURLをぺたっとどうぞ。</div>
+                  <div className="recent-empty">履歴はまだありません。</div>
                 ) : dashboard.trackedUsers.slice(0, 6).map((user) => {
                   const active = dashboard.tracker.trackedUserId === user.userId && dashboard.tracker.isRunning;
                   return (
@@ -714,9 +714,9 @@ export function App() {
             </article>
 
             <article className="cozy-card sticker-card">
-              <div className="cozy-sign">すきな時間を<br /><b>いっしょに。♡</b></div>
+              <div className="cozy-sign">好きな配信を<br /><b>自分のペースで。</b></div>
               <div className="cozy-art"><span className="headphones">🎧</span><img src="./assets/caspulse-icon.png" alt="" /><span className="mug">☕</span></div>
-              <p>ツイキャスでつながる、<br />みんなのたのしい居場所。</p>
+              <p>コメントと盛り上がりを、<br />ひとつの画面で。</p>
               <b className="cozy-brand">CASPULSE⌁</b>
             </article>
           </aside>
@@ -729,25 +729,25 @@ export function App() {
         }}>
           <section className="settings-modal" role="dialog" aria-modal="true" aria-label="CASPULSE settings">
             <div className="modal-head">
-              <div><span className="modal-kicker">⚙ ちょこっと設定</span><h2>CASPULSEの設定</h2></div>
+              <div><span className="modal-kicker">⚙ SETTINGS</span><h2>CASPULSEの設定</h2></div>
               <button type="button" onClick={() => setSettingsOpen(false)}>×</button>
             </div>
 
             <div className="connection-card">
               <div className={`connection-orb ${relayOnline ? 'online' : ''}`}>{relayOnline ? '✓' : '○'}</div>
               <div>
-                <b>{relayOnline ? 'CASPULSE Relayにつながってるよ' : 'Relayを確認できないみたい'}</b>
+                <b>{relayOnline ? 'CASPULSE Relay 接続済み' : 'CASPULSE Relayに接続できません'}</b>
                 <span>ツイキャスへのログイン・Client ID入力は不要。</span>
               </div>
               <span className="setting-value">{relayOnline ? 'READY' : 'CHECK'}</span>
             </div>
 
-            <div className="simple-setting-row"><div><b>💬 コメント読み上げ</b><span>ホーム画面の「読み上げ」でON/OFFできるよ。</span></div><span className="setting-value">{ttsEnabled ? 'ON' : 'OFF'}</span></div>
+            <div className="simple-setting-row"><div><b>💬 コメント読み上げ</b><span>ホーム画面からON/OFFを切り替えられます。</span></div><span className="setting-value">{ttsEnabled ? 'ON' : 'OFF'}</span></div>
             <div className="simple-setting-row"><div><b>💾 保存</b><span>コメントと盛り上がり記録はローカルSQLite。</span></div><span className="setting-value">LOCAL</span></div>
 
             <details className="advanced-settings">
               <summary>このアプリについて</summary>
-              <p>配信URL・配信情報の取得にはCASPULSE Relayを使うよ。コメント履歴や盛り上がり記録はこのPCのSQLiteに保存する。</p>
+              <p>配信情報の取得にはCASPULSE Relayを使用します。コメント履歴と盛り上がり記録はこのPCのSQLiteに保存します。</p>
               <div className="dev-info-row"><span>MODE</span><b>ANONYMOUS VIEWER</b></div>
               <div className="dev-info-row"><span>RELAY</span><code>https://caspulse-relay.vercel.app</code></div>
               <small>CASPULSE独自のアカウント登録やツイキャスOAuthは不要。</small>

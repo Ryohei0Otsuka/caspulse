@@ -82,7 +82,7 @@ function registerIpc() {
             at: Math.floor(Date.now() / 1000),
             kind: 'system',
             label: 'INPUT',
-            message: `URLをみつけたよ：${parsed.originalInput}`,
+            message: `URLを確認：${parsed.originalInput}`,
         });
         const user = await api.getUser(parsed.screenIdOrUserId);
         const target = db.upsertTrackedUser(user);
@@ -91,7 +91,7 @@ function registerIpc() {
             at: Math.floor(Date.now() / 1000),
             kind: 'system',
             label: 'RESOLVE',
-            message: `配信者をみつけた！ @${user.screen_id}`,
+            message: `配信者を確認：@${user.screen_id}`,
             detail: `${user.name} · fixed uid:${user.id}`,
         });
         await tracker.start(target);
