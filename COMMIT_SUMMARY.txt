@@ -1,0 +1,1 @@
+Redesign CASPULSE with a playful TwitCasting-first UI, friendly live logs, real stream previews, and a custom app icon
