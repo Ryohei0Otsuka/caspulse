@@ -1,16 +1,14 @@
 import path from 'node:path';
-import { app, BrowserWindow, clipboard, ipcMain, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, shell } from 'electron';
 import type {
-  AuthStatus,
   DashboardPayload,
   StartTrackingResult,
+  StoredComment,
+  StreamMetric,
   TerminalEvent,
   TrackerUpdate,
-  TwitCastingUser,
 } from '../shared/types';
 import { DatabaseService } from './database';
-import { CASPULSE_TWITCASTING_CLIENT_ID } from './generated-oauth-config';
-import { OAUTH_CALLBACK_URL, runImplicitOAuth } from './oauth';
 import { parseTwitCastingTarget } from './target';
 import { TrackerService } from './tracker';
 import { TwitCastingClient } from './twitcasting';
@@ -19,51 +17,14 @@ let mainWindow: BrowserWindow | null = null;
 let db: DatabaseService;
 let api: TwitCastingClient;
 let tracker: TrackerService;
-let connectedAccount: TwitCastingUser | null = null;
-let sessionToken: string | null = null;
 
-function configuredClientId(): string {
-  const embedded = CASPULSE_TWITCASTING_CLIENT_ID.trim();
-  if (embedded) return embedded;
-  // v0.1.2以前に設定済みの開発環境は、そのまま移行できるようにする。
-  return db?.getSetting('oauth.client_id')?.trim() ?? '';
-}
-
-function saveToken(token: string): void {
-  sessionToken = token;
-  if (!safeStorage.isEncryptionAvailable()) {
-    db.deleteSetting('oauth.token');
-    return;
-  }
-  const encrypted = safeStorage.encryptString(token).toString('base64');
-  db.setSetting('oauth.token', encrypted);
-}
-
-function readStoredToken(): string | null {
-  if (sessionToken) return sessionToken;
-  const encoded = db.getSetting('oauth.token');
-  if (!encoded || !safeStorage.isEncryptionAvailable()) return null;
-  try {
-    sessionToken = safeStorage.decryptString(Buffer.from(encoded, 'base64'));
-    return sessionToken;
-  } catch {
-    db.deleteSetting('oauth.token');
-    return null;
-  }
-}
-
-function clearToken(): void {
-  sessionToken = null;
-  db.deleteSetting('oauth.token');
-}
-
-function authStatus(): AuthStatus {
+function relayStatus() {
   return {
-    connected: Boolean(connectedAccount),
-    account: connectedAccount,
-    callbackUrl: OAUTH_CALLBACK_URL,
-    secureStorageAvailable: safeStorage.isEncryptionAvailable(),
-    appClientConfigured: Boolean(configuredClientId()),
+    connected: true,
+    account: null,
+    callbackUrl: '',
+    secureStorageAvailable: true,
+    appClientConfigured: true,
   };
 }
 
@@ -77,8 +38,8 @@ function buildDashboard(userId?: string): DashboardPayload {
       : trackedUsers[0] ?? null;
 
   let liveMovie = null;
-  let metrics = [];
-  let comments = [];
+  let metrics: StreamMetric[] = [];
+  let comments: StoredComment[] = [];
 
   if (selectedUser) {
     liveMovie = trackerUserId === selectedUser.userId ? tracker.getLiveMovie() : null;
@@ -94,7 +55,7 @@ function buildDashboard(userId?: string): DashboardPayload {
 
   return {
     trackedUsers,
-    auth: authStatus(),
+    auth: relayStatus(),
     tracker: tracker.getStatus(),
     selectedUser,
     liveMovie,
@@ -103,25 +64,12 @@ function buildDashboard(userId?: string): DashboardPayload {
   };
 }
 
-async function restoreAuth(): Promise<void> {
-  const token = readStoredToken();
-  if (!token) return;
-  api.setToken(token);
-  try {
-    connectedAccount = await api.verifyToken();
-  } catch {
-    api.setToken(null);
-    clearToken();
-    connectedAccount = null;
-  }
-}
-
 function sendTerminal(event: TerminalEvent): void {
   if (!mainWindow?.isDestroyed()) mainWindow?.webContents.send('terminal:event', event);
 }
 
-function clipboardTwitCastingTarget(): string | null {
-  const raw = clipboard.readText().trim();
+async function clipboardTwitCastingTarget(): Promise<string | null> {
+  const raw = (await clipboard.readText()).trim();
   if (!raw || raw.length > 2048 || !/twitcasting\.tv/i.test(raw)) return null;
   try {
     return parseTwitCastingTarget(raw).originalInput;
@@ -134,47 +82,12 @@ function registerIpc(): void {
   ipcMain.handle('app:get-bootstrap', async () => buildDashboard());
   ipcMain.handle('data:get-dashboard', async (_event, userId?: string) => buildDashboard(userId));
 
-  ipcMain.handle('auth:start', async () => {
-    const clientId = configuredClientId();
-    if (!clientId) {
-      throw new Error('この開発ビルドにはCASPULSEのClient IDがまだ設定されていません。.env.local を設定して再起動してください。');
-    }
-    const token = await runImplicitOAuth(clientId);
-    api.setToken(token);
-    const account = await api.verifyToken();
-    saveToken(token);
-    connectedAccount = account;
-    sendTerminal({
-      id: `auth-${Date.now()}`,
-      at: Math.floor(Date.now() / 1000),
-      kind: 'system',
-      label: 'AUTH',
-      message: `ツイキャスとつながった！ @${account.screen_id}`,
-      detail: `uid:${account.id}`,
-    });
-    return authStatus();
-  });
-
-  ipcMain.handle('auth:import-token', async (_event, rawToken: string) => {
-    const token = String(rawToken ?? '').trim();
-    if (!token || token.length > 2048) throw new Error('有効なアクセストークンを入力してください。');
-    api.setToken(token);
-    const account = await api.verifyToken();
-    saveToken(token);
-    connectedAccount = account;
-    return authStatus();
-  });
-
-  ipcMain.handle('auth:disconnect', async () => {
-    tracker.stop();
-    api.setToken(null);
-    connectedAccount = null;
-    clearToken();
-    return authStatus();
-  });
+  ipcMain.handle('relay:status', async () => ({
+    ok: await api.health(),
+    baseUrl: api.getRelayBaseUrl(),
+  }));
 
   ipcMain.handle('tracker:start-input', async (_event, rawInput: string): Promise<StartTrackingResult> => {
-    if (!connectedAccount) throw new Error('先に「ツイキャスとつなぐ」を押してね。');
     const parsed = parseTwitCastingTarget(String(rawInput ?? ''));
     sendTerminal({
       id: `input-${Date.now()}`,
@@ -198,7 +111,6 @@ function registerIpc(): void {
   });
 
   ipcMain.handle('tracker:start-user', async (_event, userId: string) => {
-    if (!connectedAccount) throw new Error('先に「ツイキャスとつなぐ」を押してね。');
     const stored = db.getTrackedUser(String(userId ?? ''));
     if (!stored) throw new Error('最近つないだ配信に対象ユーザーが見つかりません。');
     const latestIdentity = await api.getUser(stored.userId);
@@ -214,7 +126,7 @@ function registerIpc(): void {
     db.removeTrackedUser(normalized);
   });
 
-  ipcMain.handle('clipboard:get-twitcasting-target', async () => clipboardTwitCastingTarget());
+  ipcMain.handle('clipboard:get-twitcasting-target', async () => await clipboardTwitCastingTarget());
 
   ipcMain.handle('thumbnail:get-live', async (_event, userId: string) => {
     const normalized = String(userId ?? '').trim();
@@ -270,7 +182,7 @@ async function createWindow(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  app.setAppUserModelId('io.github.ryohei0otsuka.caspulse');
+  app.setAppUserModelId('app.caspulse.desktop');
   db = new DatabaseService(app.getPath('userData'));
   api = new TwitCastingClient();
   tracker = new TrackerService(api, db);
@@ -281,7 +193,6 @@ app.whenReady().then(async () => {
   tracker.on('terminal', (event: TerminalEvent) => sendTerminal(event));
 
   registerIpc();
-  await restoreAuth();
   await createWindow();
 
   app.on('activate', async () => {

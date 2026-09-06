@@ -15,11 +15,11 @@ const THUMBNAIL_REFRESH_MS = 20_000;
 const emptyDashboard: DashboardPayload = {
   trackedUsers: [],
   auth: {
-    connected: false,
+    connected: true,
     account: null,
-    callbackUrl: 'http://127.0.0.1:47831/oauth/callback',
+    callbackUrl: '',
     secureStorageAvailable: true,
-    appClientConfigured: false,
+    appClientConfigured: true,
   },
   tracker: {
     trackedUserId: null,
@@ -239,9 +239,7 @@ export function App() {
   const [dashboard, setDashboard] = useState<DashboardPayload>(emptyDashboard);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [targetInput, setTargetInput] = useState('');
-  const [manualToken, setManualToken] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [onboardingOpen, setOnboardingOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [terminal, setTerminal] = useState<TerminalEvent[]>([]);
@@ -251,6 +249,7 @@ export function App() {
   const [ttsIncludeName, setTtsIncludeName] = useState(false);
   const [clipboardCandidate, setClipboardCandidate] = useState<string | null>(null);
   const [liveThumbnail, setLiveThumbnail] = useState<string | null>(null);
+  const [relayOnline, setRelayOnline] = useState<boolean | null>(null);
   const terminalEndRef = useRef<HTMLDivElement | null>(null);
 
   const refresh = async (userId?: string) => {
@@ -263,9 +262,14 @@ export function App() {
     void window.caspulse.getBootstrap().then((data) => {
       setDashboard(data);
       setSelectedUserId(data.selectedUser?.userId ?? null);
-      setOnboardingOpen(!data.auth.connected);
-      return window.caspulse.getClipboardTwitCastingTarget();
-    }).then((candidate) => setClipboardCandidate(candidate))
+      return Promise.all([
+        window.caspulse.getClipboardTwitCastingTarget(),
+        window.caspulse.getRelayStatus(),
+      ]);
+    }).then(([candidate, relay]) => {
+      setClipboardCandidate(candidate);
+      setRelayOnline(relay.ok);
+    })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
 
     const offTracker = window.caspulse.onTrackerUpdate((update: TrackerUpdate) => {
@@ -380,10 +384,6 @@ export function App() {
 
   const handleTrace = (event: FormEvent) => {
     event.preventDefault();
-    if (!dashboard.auth.connected) {
-      setOnboardingOpen(true);
-      return;
-    }
     void runAction(async () => {
       const result = await window.caspulse.startTrackingInput(targetInput);
       setDashboard(result.dashboard);
@@ -406,39 +406,6 @@ export function App() {
     void runAction(async () => {
       await window.caspulse.stopTracking();
       await refresh(selectedUserId ?? undefined);
-    });
-  };
-
-  const connectOAuth = () => {
-    void runAction(async () => {
-      const auth = await window.caspulse.authStart();
-      setDashboard((current) => ({ ...current, auth }));
-      setManualToken('');
-      setOnboardingOpen(false);
-      setSettingsOpen(false);
-    });
-  };
-
-  const importToken = () => {
-    void runAction(async () => {
-      const auth = await window.caspulse.authImportToken(manualToken);
-      setDashboard((current) => ({ ...current, auth }));
-      setManualToken('');
-      setOnboardingOpen(false);
-      setSettingsOpen(false);
-    });
-  };
-
-  const disconnect = () => {
-    void runAction(async () => {
-      const auth = await window.caspulse.authDisconnect();
-      setDashboard((current) => ({
-        ...current,
-        auth,
-        tracker: { ...current.tracker, isRunning: false, isLive: false, activeMovieId: null },
-        liveMovie: null,
-      }));
-      setOnboardingOpen(true);
     });
   };
 
@@ -482,8 +449,8 @@ export function App() {
         <div className="top-message">
           <span>好きな配信が、</span>
           <b>もっと好きになる。♡</b>
-          <small className={dashboard.auth.connected ? 'connected' : ''}>
-            {dashboard.auth.connected ? `● @${dashboard.auth.account?.screen_id} とつながってる` : '○ まずはツイキャスとつなごう'}
+          <small className={relayOnline ? 'connected' : ''}>
+            {relayOnline === null ? '○ Relayを確認中…' : relayOnline ? '● URLを貼るだけでOK' : '○ Relayにつながらない'}
           </small>
         </div>
       </header>
@@ -706,7 +673,7 @@ export function App() {
                   const active = dashboard.tracker.trackedUserId === user.userId && dashboard.tracker.isRunning;
                   return (
                     <div className={`recent-user ${user.userId === selectedUserId ? 'selected' : ''}`} key={user.userId}>
-                      <button type="button" className="recent-main" onClick={() => startRecent(user)} disabled={busy || !dashboard.auth.connected}>
+                      <button type="button" className="recent-main" onClick={() => startRecent(user)} disabled={busy}>
                         <img src={user.image} alt="" />
                         <span><b>{user.name}</b><small>@{user.screenId}</small></span>
                         {active && <i>●</i>}
@@ -728,37 +695,6 @@ export function App() {
         </section>
       </main>
 
-      {onboardingOpen && !dashboard.auth.connected && (
-        <div className="onboarding-backdrop">
-          <section className="onboarding-card" role="dialog" aria-modal="true" aria-label="CASPULSE welcome">
-            <button type="button" className="onboarding-close" onClick={() => setOnboardingOpen(false)}>×</button>
-            <div className="welcome-glow" />
-            <img className="welcome-icon" src="./assets/caspulse-icon.png" alt="" />
-            <span className="welcome-kicker">HELLO, STREAM!</span>
-            <h2>ようこそ、CASPULSEへ。</h2>
-            <p className="welcome-copy">好きな配信を、<b>もうちょっと近くで。</b><br />最初にツイキャスとつなぐだけ。</p>
-            <div className="welcome-steps">
-              <span><b>1</b> ツイキャスとつなぐ</span>
-              <span><b>2</b> URLをぺたっ</span>
-              <span><b>3</b> のぞきにいく！</span>
-            </div>
-            {dashboard.auth.appClientConfigured ? (
-              <button type="button" className="connect-big" onClick={connectOAuth} disabled={busy}>
-                <span>♡</span>{busy ? 'つないでる…' : 'ツイキャスとつなぐ'}<i>✦</i>
-              </button>
-            ) : (
-              <div className="dev-build-card">
-                <b>🛠 このソース版は、まだ開発者設定が空っぽ。</b>
-                <p>Repository直下に <code>.env.local</code> を作って、CASPULSE用Client IDを1行だけ設定してね。</p>
-                <code>CASPULSE_TWITCASTING_CLIENT_ID=あなたのClientID</code>
-                <small>Client Secretは入れない。公開版Setup.exeでは、この表示自体が出ない設計。</small>
-              </div>
-            )}
-            <p className="welcome-note">CASPULSEが勝手にコメント投稿や配信をすることはありません。</p>
-          </section>
-        </div>
-      )}
-
       {settingsOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setSettingsOpen(false);
@@ -770,26 +706,23 @@ export function App() {
             </div>
 
             <div className="connection-card">
-              <div className={`connection-orb ${dashboard.auth.connected ? 'online' : ''}`}>{dashboard.auth.connected ? '✓' : '○'}</div>
-              <div><b>{dashboard.auth.connected ? 'ツイキャスとつながってるよ' : 'まだツイキャスとつながってないよ'}</b><span>{dashboard.auth.connected ? `@${dashboard.auth.account?.screen_id}` : '初回だけ連携すればOK'}</span></div>
-              {!dashboard.auth.connected && dashboard.auth.appClientConfigured && <button type="button" onClick={connectOAuth} disabled={busy}>つなぐ ✦</button>}
-              {dashboard.auth.connected && <button type="button" className="disconnect-button" onClick={disconnect}>つながりを切る</button>}
+              <div className={`connection-orb ${relayOnline ? 'online' : ''}`}>{relayOnline ? '✓' : '○'}</div>
+              <div>
+                <b>{relayOnline ? 'CASPULSE Relayにつながってるよ' : 'Relayを確認できないみたい'}</b>
+                <span>ツイキャスへのログイン・Client ID入力は不要。</span>
+              </div>
+              <span className="setting-value">{relayOnline ? 'READY' : 'CHECK'}</span>
             </div>
 
             <div className="simple-setting-row"><div><b>💬 コメント読み上げ</b><span>ホーム画面の「読み上げ」でON/OFFできるよ。</span></div><span className="setting-value">{ttsEnabled ? 'ON' : 'OFF'}</span></div>
             <div className="simple-setting-row"><div><b>💾 保存</b><span>コメントと盛り上がり記録はローカルSQLite。</span></div><span className="setting-value">LOCAL</span></div>
 
-            {!dashboard.auth.secureStorageAvailable && <div className="storage-warning">OSの安全な暗号化ストレージが使えないため、Access Tokenは再起動後に残さないよ。</div>}
-
             <details className="advanced-settings">
-              <summary>開発者向け</summary>
-              <p>通常利用では開かなくてOK。公開版はClient IDをビルド時に同梱する。</p>
-              <div className="dev-info-row"><span>Client ID</span><b>{dashboard.auth.appClientConfigured ? 'このビルドに設定済み' : '未設定'}</b></div>
-              <div className="dev-info-row"><span>Callback</span><code>{dashboard.auth.callbackUrl}</code></div>
-              <label>Access Tokenを直接確認する場合だけ</label>
-              <input type="password" value={manualToken} onChange={(event) => setManualToken(event.target.value)} placeholder="access_token" />
-              <button type="button" className="ghost-wide" onClick={importToken} disabled={busy || !manualToken.trim()}>確認して保存</button>
-              <small>Client SecretはCASPULSEへ入力しない・配布しない。</small>
+              <summary>このアプリについて</summary>
+              <p>配信URL・配信情報の取得にはCASPULSE Relayを使うよ。コメント履歴や盛り上がり記録はこのPCのSQLiteに保存する。</p>
+              <div className="dev-info-row"><span>MODE</span><b>ANONYMOUS VIEWER</b></div>
+              <div className="dev-info-row"><span>RELAY</span><code>https://caspulse-relay.vercel.app</code></div>
+              <small>CASPULSE独自のアカウント登録やツイキャスOAuthは不要。</small>
             </details>
           </section>
         </div>

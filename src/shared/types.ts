@@ -135,9 +135,7 @@ export interface StartTrackingResult {
 
 export interface CaspulseApi {
   getBootstrap: () => Promise<DashboardPayload>;
-  authStart: () => Promise<AuthStatus>;
-  authImportToken: (token: string) => Promise<AuthStatus>;
-  authDisconnect: () => Promise<AuthStatus>;
+  getRelayStatus: () => Promise<{ ok: boolean; baseUrl: string }>;
   startTrackingInput: (input: string) => Promise<StartTrackingResult>;
   startTrackingUser: (userId: string) => Promise<TrackerStatus>;
   stopTracking: () => Promise<TrackerStatus>;

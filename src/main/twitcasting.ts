@@ -4,7 +4,8 @@ import type {
   TwitCastingUser,
 } from '../shared/types';
 
-const BASE_URL = 'https://apiv2.twitcasting.tv';
+const TWITCASTING_BASE_URL = 'https://apiv2.twitcasting.tv';
+const DEFAULT_RELAY_BASE_URL = 'https://caspulse-relay.vercel.app';
 
 interface UserResponse {
   user: TwitCastingUser;
@@ -14,10 +15,6 @@ interface CurrentLiveResponse {
   movie: TwitCastingMovie;
   broadcaster: TwitCastingUser;
   tags: string[];
-}
-
-interface VerifyResponse {
-  user: TwitCastingUser;
 }
 
 export interface CommentsResponse {
@@ -38,27 +35,41 @@ export class TwitCastingApiError extends Error {
 }
 
 export class TwitCastingClient {
-  constructor(private token: string | null = null) {}
+  private readonly relayBaseUrl: string;
 
-  setToken(token: string | null): void {
-    this.token = token;
+  constructor(relayBaseUrl = process.env.CASPULSE_RELAY_URL || DEFAULT_RELAY_BASE_URL) {
+    this.relayBaseUrl = relayBaseUrl.replace(/\/+$/, '');
   }
 
-  async verifyToken(tokenOverride?: string): Promise<TwitCastingUser> {
-    const response = await this.request<VerifyResponse>('/verify_credentials', tokenOverride);
-    return response.user;
+  getRelayBaseUrl(): string {
+    return this.relayBaseUrl;
+  }
+
+  async health(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.relayBaseUrl}/api/health`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) return false;
+      const body = await response.json() as { ok?: boolean };
+      return body.ok === true;
+    } catch {
+      return false;
+    }
   }
 
   async getUser(userIdOrScreenId: string): Promise<TwitCastingUser> {
-    const id = encodeURIComponent(userIdOrScreenId.replace(/^@/, '').trim());
-    const response = await this.request<UserResponse>(`/users/${id}`);
+    const target = userIdOrScreenId.replace(/^@/, '').trim();
+    const response = await this.relayRequest<UserResponse>(
+      `/api/user?target=${encodeURIComponent(target)}`,
+    );
     return response.user;
   }
 
   async getCurrentLive(userId: string): Promise<CurrentLiveResponse | null> {
     try {
-      return await this.request<CurrentLiveResponse>(
-        `/users/${encodeURIComponent(userId)}/current_live`,
+      return await this.relayRequest<CurrentLiveResponse>(
+        `/api/live?user_id=${encodeURIComponent(userId)}`,
       );
     } catch (error) {
       if (error instanceof TwitCastingApiError && error.status === 404) return null;
@@ -66,9 +77,13 @@ export class TwitCastingClient {
     }
   }
 
+  // The official live-thumbnail endpoint is public, so the image can be fetched
+  // directly without exposing any CASPULSE secret.
   async getLiveThumbnailDataUrl(userId: string): Promise<string | null> {
     const id = encodeURIComponent(userId.trim());
-    const response = await fetch(`${BASE_URL}/users/${id}/live/thumbnail?size=large&position=latest`);
+    const response = await fetch(
+      `${TWITCASTING_BASE_URL}/users/${id}/live/thumbnail?size=large&position=latest`,
+    );
     if (!response.ok) return null;
     const contentType = response.headers.get('content-type') ?? 'image/jpeg';
     if (!contentType.startsWith('image/')) return null;
@@ -77,42 +92,44 @@ export class TwitCastingClient {
   }
 
   async getComments(movieId: string, sliceId?: string): Promise<CommentsResponse> {
-    const params = new URLSearchParams({ limit: '50' });
+    const params = new URLSearchParams({ movie_id: movieId });
     if (sliceId) params.set('slice_id', sliceId);
-    return this.request<CommentsResponse>(
-      `/movies/${encodeURIComponent(movieId)}/comments?${params.toString()}`,
-    );
+    return this.relayRequest<CommentsResponse>(`/api/comments?${params.toString()}`);
   }
 
-  private async request<T>(path: string, tokenOverride?: string): Promise<T> {
-    const token = tokenOverride ?? this.token;
-    if (!token) {
-      throw new Error('まだツイキャスとつながってないよ。設定からOAuth連携してね。');
+  private async relayRequest<T>(path: string): Promise<T> {
+    let response: Response;
+    try {
+      response = await fetch(`${this.relayBaseUrl}${path}`, {
+        headers: { Accept: 'application/json' },
+      });
+    } catch {
+      throw new TwitCastingApiError(
+        'CASPULSE Relayにつながらないみたい。ネット接続を確認して、もう一度ためしてね。',
+        0,
+      );
     }
 
-    const response = await fetch(`${BASE_URL}${path}`, {
-      headers: {
-        Accept: 'application/json',
-        'X-Api-Version': '2.0',
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
     if (!response.ok) {
-      let message = `TwitCasting API error (${response.status})`;
+      let message = `CASPULSE Relay error (${response.status})`;
       let code: number | undefined;
+
       try {
-        const body = (await response.json()) as {
-          error?: { message?: string; code?: number };
+        const body = await response.json() as {
+          error?: string | { message?: string; code?: number };
+          details?: { error?: { message?: string; code?: number } };
         };
-        if (body.error?.message) message = body.error.message;
-        if (typeof body.error?.code === 'number') code = body.error.code;
+        const apiError = body.details?.error;
+        if (apiError?.message) message = apiError.message;
+        if (typeof apiError?.code === 'number') code = apiError.code;
+        if (typeof body.error === 'string' && !apiError?.message) message = body.error;
       } catch {
-        // Keep the generic HTTP error if the response body is not JSON.
+        // Keep the generic HTTP error.
       }
+
       throw new TwitCastingApiError(message, response.status, code);
     }
 
-    return (await response.json()) as T;
+    return await response.json() as T;
   }
 }

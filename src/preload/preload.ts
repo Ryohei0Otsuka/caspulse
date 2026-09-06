@@ -3,9 +3,7 @@ import type { CaspulseApi, TerminalEvent, TrackerUpdate } from '../shared/types'
 
 const api: CaspulseApi = {
   getBootstrap: () => ipcRenderer.invoke('app:get-bootstrap'),
-  authStart: () => ipcRenderer.invoke('auth:start'),
-  authImportToken: (token) => ipcRenderer.invoke('auth:import-token', token),
-  authDisconnect: () => ipcRenderer.invoke('auth:disconnect'),
+  getRelayStatus: () => ipcRenderer.invoke('relay:status'),
   startTrackingInput: (input) => ipcRenderer.invoke('tracker:start-input', input),
   startTrackingUser: (userId) => ipcRenderer.invoke('tracker:start-user', userId),
   stopTracking: () => ipcRenderer.invoke('tracker:stop'),

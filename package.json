@@ -1,9 +1,9 @@
 {
   "name": "caspulse",
-  "version": "0.1.3",
+  "version": "0.2.1",
   "private": true,
-  "description": "A playful local TwitCasting stream companion that follows broadcaster IDs, logs comments, and visualizes the live vibe.",
-  "author": "Ryohei0Otsuka",
+  "description": "A playful portable TwitCasting companion: paste a stream URL and watch comments, viewers, and momentum locally.",
+  "author": "CASPULSE Project",
   "license": "MIT",
   "main": "dist-electron/main/main.js",
   "scripts": {
@@ -17,8 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
-    "predev": "node scripts/generate-oauth-config.mjs",
-    "prebuild": "node scripts/generate-oauth-config.mjs"
+    "build:portable": "npm run build && electron-builder --win portable --x64"
   },
   "dependencies": {
     "react": "19.2.8",
@@ -38,7 +37,7 @@
     "wait-on": "^8.0.4"
   },
   "build": {
-    "appId": "io.github.ryohei0otsuka.caspulse",
+    "appId": "app.caspulse.desktop",
     "productName": "CASPULSE",
     "directories": {
       "output": "release"
@@ -50,20 +49,12 @@
     ],
     "win": {
       "target": [
-        "nsis",
         "portable"
       ],
       "icon": "build/icon.ico"
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "artifactName": "CASPULSE-Setup-${version}-${arch}.${ext}"
-    },
     "portable": {
-      "artifactName": "CASPULSE-Portable-${version}-${arch}.${ext}"
+      "artifactName": "CASPULSE.exe"
     }
   }
 }

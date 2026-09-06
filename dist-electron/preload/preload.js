@@ -3,9 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const api = {
     getBootstrap: () => electron_1.ipcRenderer.invoke('app:get-bootstrap'),
-    authStart: () => electron_1.ipcRenderer.invoke('auth:start'),
-    authImportToken: (token) => electron_1.ipcRenderer.invoke('auth:import-token', token),
-    authDisconnect: () => electron_1.ipcRenderer.invoke('auth:disconnect'),
+    getRelayStatus: () => electron_1.ipcRenderer.invoke('relay:status'),
     startTrackingInput: (input) => electron_1.ipcRenderer.invoke('tracker:start-input', input),
     startTrackingUser: (userId) => electron_1.ipcRenderer.invoke('tracker:start-user', userId),
     stopTracking: () => electron_1.ipcRenderer.invoke('tracker:stop'),
