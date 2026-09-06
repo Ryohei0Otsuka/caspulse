@@ -1,105 +1,44 @@
 # CASPULSE
 
-> ツイキャスの“いま”を、いっしょに楽しむポータブル・ローカルアプリ。
+**ツイキャスの“いま”を、もっと楽しく。**
 
-CASPULSE は、ツイキャスの配信URLを貼るだけで、コメントの流れ・視聴者推移・コメント速度・勢いをローカルで眺めるためのデスクトップアプリです。
+CASPULSE は、ツイキャスの配信URLを貼るだけで
+コメント・視聴者数・盛り上がりを眺められる **Windows向けローカルアプリ** です。
 
-## 利用者の使い方
+## ✦ 使い方
 
-インストールは不要です。
-
-1. 配布ZIPを解凍
-2. `CASPULSE.exe` をダブルクリック
-3. 起動画面上部の **「ここに配信URLを貼ってね」** へURLを貼る（`📋 貼り付け`でもOK）
-4. **のぞきにいく！**
-
-ツイキャスDeveloper登録、Client ID入力、OAuth連携、npm は利用者には不要です。
-
-## 取得と保存
-
-CASPULSE本体はローカルで動作します。
-
-- 配信者情報 / 現在配信 / コメント取得: `CASPULSE Relay`
-- 配信サムネイル: TwitCasting公式Live Thumbnail
-- コメント履歴 / 盛り上がり指標 / 最近つないだ配信: 利用者PCのSQLite
-- コメント読み上げ: OS / ChromiumのSpeech Synthesis
-
-RelayはCASPULSEのClient Secretを配布exeへ埋め込まないための読み取り専用中継です。
-
-`https://caspulse-relay.vercel.app`
-
-CASPULSE独自の利用者アカウントは作成しません。
-
-## 開発者向け
-
-### 必要環境
-
-- Windows 11
-- Node.js 24系推奨
-- npm
-
-### 開発起動
-
-```powershell
-npm install
-npm run dev
-```
-
-### Portable EXEを作る
-
-```powershell
-npm run build:portable
-```
-
-成功すると:
+1. [Releases](../../releases) から Windows版をダウンロード
+2. ZIPを解凍
+3. `CASPULSE.exe` を起動
+4. 配信URLを貼って **「のぞきにいく！」**
 
 ```text
-release/
-└─ CASPULSE.exe
+https://twitcasting.tv/xxxxx
 ```
 
-この `CASPULSE.exe` はインストーラーではありません。単体で起動するPortable版です。
+**インストール・アカウント登録・Client ID設定は不要です。**
 
-### Relay URLを開発時だけ差し替える
+## ✦ できること
 
-PowerShell:
+* 💬 コメントの流れ
+* 👀 視聴者数
+* ⚡ 配信の勢い
+* 📈 盛り上がりグラフ
+* 🔊 コメント読み上げ
+* 🖼️ 配信サムネイル
+* 🗂️ コメント・履歴のローカル保存
 
-```powershell
-$env:CASPULSE_RELAY_URL="http://127.0.0.1:3000"
-npm run dev
-```
+## ✦ 動作環境
 
-未指定時は本番Relay `https://caspulse-relay.vercel.app` を使います。
+**Windows 10 / 11 64-bit**
 
-## 現在の機能
+インターネット接続が必要です。
 
-- TwitCasting URL / `@screen_id` / user ID入力
-- 配信者解決とID追従
-- 配信開始 / 終了追跡
-- コメント取得・SQLite保存
-- コメント速度
-- 視聴者推移
-- 勢い / activity score
-- ポップなライブダッシュボード
-- わいわいログ
-- コメント読み上げ
-- 実配信サムネイル表示
-- 最近つないだ配信
+## ✦ データについて
 
-## 今後
+コメント履歴や盛り上がりデータは、基本的に **あなたのPC内** に保存されます。
 
-- MOMENT / AUTO MOMENT
-- 録音（権利・許諾を前提とした用途）
-- 音声文字起こし
-- 文脈サマリー
-- アイテム連携可能範囲の整理
-- Relayのキャッシュ / abuse protection
-
-## Privacy
-
-CASPULSEは、アプリ独自のログインや利用者アカウントを要求しません。
-
-長期のコメントログや分析データはローカルSQLiteへ保存します。API中継のため対象となる配信識別情報はCASPULSE Relayへ送信されます。ネットワーク通信である以上、ホスティング基盤等で通常の通信ログが扱われる可能性はあります。
+CASPULSE独自のユーザー登録はありません。
 
 ## License
 
