@@ -93,10 +93,10 @@ export interface TrackerStatus {
 
 export interface AuthStatus {
   connected: boolean;
-  clientId: string;
   account: TwitCastingUser | null;
   callbackUrl: string;
   secureStorageAvailable: boolean;
+  appClientConfigured: boolean;
 }
 
 export interface DashboardPayload {
@@ -135,7 +135,7 @@ export interface StartTrackingResult {
 
 export interface CaspulseApi {
   getBootstrap: () => Promise<DashboardPayload>;
-  authStart: (clientId: string) => Promise<AuthStatus>;
+  authStart: () => Promise<AuthStatus>;
   authImportToken: (token: string) => Promise<AuthStatus>;
   authDisconnect: () => Promise<AuthStatus>;
   startTrackingInput: (input: string) => Promise<StartTrackingResult>;
@@ -143,6 +143,8 @@ export interface CaspulseApi {
   stopTracking: () => Promise<TrackerStatus>;
   removeTrackedUser: (userId: string) => Promise<void>;
   getDashboard: (userId?: string) => Promise<DashboardPayload>;
+  getClipboardTwitCastingTarget: () => Promise<string | null>;
+  getLiveThumbnail: (userId: string) => Promise<string | null>;
   openExternal: (url: string) => Promise<void>;
   onTrackerUpdate: (listener: (update: TrackerUpdate) => void) => () => void;
   onTerminalEvent: (listener: (event: TerminalEvent) => void) => () => void;

@@ -3,7 +3,7 @@ import type { CaspulseApi, TerminalEvent, TrackerUpdate } from '../shared/types'
 
 const api: CaspulseApi = {
   getBootstrap: () => ipcRenderer.invoke('app:get-bootstrap'),
-  authStart: (clientId) => ipcRenderer.invoke('auth:start', clientId),
+  authStart: () => ipcRenderer.invoke('auth:start'),
   authImportToken: (token) => ipcRenderer.invoke('auth:import-token', token),
   authDisconnect: () => ipcRenderer.invoke('auth:disconnect'),
   startTrackingInput: (input) => ipcRenderer.invoke('tracker:start-input', input),
@@ -11,6 +11,8 @@ const api: CaspulseApi = {
   stopTracking: () => ipcRenderer.invoke('tracker:stop'),
   removeTrackedUser: (userId) => ipcRenderer.invoke('tracked:remove', userId),
   getDashboard: (userId) => ipcRenderer.invoke('data:get-dashboard', userId),
+  getClipboardTwitCastingTarget: () => ipcRenderer.invoke('clipboard:get-twitcasting-target'),
+  getLiveThumbnail: (userId) => ipcRenderer.invoke('thumbnail:get-live', userId),
   openExternal: (url) => ipcRenderer.invoke('open:external', url),
   onTrackerUpdate: (listener) => {
     const wrapped = (_event: Electron.IpcRendererEvent, update: TrackerUpdate) => listener(update);

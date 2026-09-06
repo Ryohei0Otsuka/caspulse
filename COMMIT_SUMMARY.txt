@@ -1,1 +1,1 @@
-Redesign CASPULSE with a playful TwitCasting-first UI, friendly live logs, real stream previews, and a custom app icon
+Polish CASPULSE v0.1.3 with easy OAuth onboarding, live thumbnail fallback, and a more playful TwitCasting UI

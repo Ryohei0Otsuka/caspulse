@@ -2,64 +2,140 @@
 
 > **ツイキャスの“いま”を、いっしょに楽しもう。**
 
-CASPULSE は、好きなTwitCasting配信をローカルPCで追いかけながら、コメント・視聴者数・コメントの勢いをひとつの画面で眺めるためのデスクトップアプリです。
+CASPULSE は、TwitCasting配信のURLを貼るだけで、コメント・視聴者数・勢い・配信の流れをひとつの画面で眺められるローカルデスクトップアプリです。
 
-URLを貼って **「のぞきにいく！」**。  
-あとは配信者の固定 `user.id` を軸に、現在の配信 `movie_id`、コメント、盛り上がりの波を追います。
-
-**v0.1.1 — Pop UI refresh**  
+**v0.1.3 — Pop UI / Easy Connect refresh**  
 Repository: `Ryohei0Otsuka/caspulse`
 
 ![CASPULSE UI concept](docs/caspulse-ui-concept.png)
 
-> 上の画像はUIデザインのコンセプトモックです。実装は同じ「ネオン × ポップ × 配信文化」の方向で構成しています。
+> デザインの方向は **ネオン × ポップ × 配信文化**。業務ダッシュボードではなく、配信の横に置いておきたくなる“配信コンパニオン”を目指しています。
+
+---
+
+## 使う人は、これだけ
+
+一般公開版では次の4ステップだけで使える形を目指しています。
+
+```text
+CASPULSE-Setup.exe
+        ↓
+インストール
+        ↓
+「ツイキャスとつなぐ」  ※初回だけ
+        ↓
+配信URLをぺたっ
+        ↓
+「のぞきにいく！」
+```
+
+利用者に **npm / GitHub / Client ID / Client Secret / Callback URL** を入力させない設計です。
+
+### 普段の使い方
+
+1. CASPULSEを起動
+2. 配信URLをコピー
+3. `配信URLをぺたっ` に貼る
+4. **のぞきにいく！**
+
+クリップボードにTwitCasting URLが入っていれば、CASPULSE側から **「ツイキャスのURLみつけた！」** と候補を出します。
+
+例：
+
+```text
+https://twitcasting.tv/g:113456859404992188053
+```
+
+`@screen_id` / `screen_id` の直接入力にも対応しています。
+
+---
+
+## 初回だけ：ツイキャスとつなぐ
+
+公開ビルドではCASPULSE用のTwitCasting **Client IDをアプリ側へ同梱**します。
+
+利用者はClient IDを探したり入力したりせず、初回画面の：
+
+```text
+[ ツイキャスとつなぐ ]
+```
+
+を押すだけです。
+
+標準ブラウザでTwitCastingの連携確認が開くので、内容を確認して連携を許可します。認証後のAccess Tokenは、利用可能なOSではElectron `safeStorage` を使ってローカル暗号化保存します。
+
+```text
+Client ID      = CASPULSE側で用意するアプリ識別ID
+Client Secret  = 配布しない / アプリへ入れない
+Access Token   = 利用者の認証後に取得 / ローカル暗号化保存
+```
+
+CASPULSEが勝手にコメント投稿や配信を行う機能はv0.1.3にはありません。
+
+---
+
+## 配信サムネイル
+
+配信中は、左上の配信カードへ **実際のライブサムネイル** を表示します。
+
+CASPULSEはTwitCasting API v2のLive Thumbnail APIを使い、`large / latest` の画像を一定間隔で更新します。
+
+```text
+配信URL
+  ↓
+配信者 user.id を解決
+  ↓
+/users/:user_id/live/thumbnail
+  ↓
+CASPULSE左上へ最新サムネイル表示
+```
+
+配信中でない場合は、配信者アイコンと「次の配信まち」表示へ切り替わります。
 
 ---
 
 ## いまできること
 
-- `https://twitcasting.tv/...` の配信URLをそのまま貼る
-- `@screen_id` / `screen_id` の直接入力にも対応
-- 表示上の `screen_id` をTwitCastingの固定 `user.id` へ解決して追従
-- 配信中なら現在の `movie_id` を自動取得
-- オフラインなら同じ固定IDのまま次の配信を待つ
-- コメントを一定間隔で取得してSQLiteへ保存
-- コメント投稿者の `screen_id` と固定 `user.id` を両方保存
-- 配信サムネイルを表示
-- **見てる人 / コメ・分 / 勢い / いま** を表示
-- 視聴者とコメントの時系列を **いまの盛り上がり** グラフとして表示
-- 最新コメントを **コメントながれ** へ表示
-- 配信イベントを **わいわいログ** へ時系列表示
-- OS / Chromiumの音声合成でコメント読み上げ
-- 最近つないだ配信をローカル保存
-- OAuthアクセストークンをElectron `safeStorage` で暗号化保存（利用可能なOSのみ）
+- `https://twitcasting.tv/...` をそのまま入力
+- クリップボードのTwitCasting URLを候補表示
+- `@screen_id` / `screen_id` の直接入力
+- `screen_id` を固定 `user.id` へ解決して追従
+- 配信開始・終了を検知
+- 現在の `movie_id` を自動追従
+- 実ライブサムネイル表示・更新
+- コメント取得 / SQLite保存
+- コメント投稿者の `screen_id` と固定 `user.id` を保存
+- **見てる人 / コメ・分 / 勢い / いま** の4カード
+- **いまの盛り上がり** グラフ
+- **コメントながれ**
+- **わいわいログ**
+- コメント読み上げ
+- 最近つないだ配信
+- Access Tokenのローカル暗号化保存
 
-v0.1.1ではスクレイピングを行わず、データ取得はTwitCasting API v2を使います。
+データ取得はTwitCasting API v2を使い、Webページの無許可スクレイピングは行いません。
 
 ---
 
-## CASPULSEの流れ
+## UI方針
 
-```text
-配信URLをぺたっ
-      ↓
-screen_id を読み取る
-      ↓
-TwitCasting user.id に解決
-      ↓
-固定 user.id でおいかける
-      ↓
-current_live を確認
-      ↓
-movie_id を取得
-      ↓
-コメント + 視聴者 + 勢い
-      ↓
-SQLite + コメントながれ + わいわいログ + 盛り上がりグラフ
-```
+CASPULSE v0.1.3では、HTML CanvasにUI全体を描く方式にはしていません。
 
-`screen_id` は画面表示に使いますが、追従の芯は解決済みの `user.id` です。  
-配信者が後から `screen_id` を変更しても、固定ID側から最新プロフィールを再取得します。
+通常のReact DOM + CSSで構築しています。理由は、入力フォーム・コメントリスト・スクロール・アクセシビリティ・レスポンシブを保ったまま、実際に操作できるUIとしてモックの雰囲気へ寄せるためです。
+
+現在の演出：
+
+- ネオンのカード枠
+- ステッカー風カード
+- 手書き風ひとこと
+- LIVE発光
+- 配信サムネイルの軽いシマー
+- グラフの吹き出し
+- コメントのホバー
+- ターミナル風 `わいわいログ`
+- CASPULSEマスコット / アプリアイコン
+
+将来、波形・パーティクル・音声ビジュアライザーなどで必要になればCanvasを限定的に追加します。
 
 ---
 
@@ -81,206 +157,168 @@ SQLite + コメントながれ + わいわいログ + 盛り上がりグラフ
 
 コメント数、参加人数、視聴者の増加、正方向の勢いを混ぜた **0〜100の実験スコア** です。
 
-これは「この話題がウケた」と原因を断定する値ではありません。おすすめ掲載、SNS流入、他配信の終了など、CASPULSEから見えない外的要因もあります。
+これは「この話題がウケた」と原因を断定する値ではありません。おすすめ掲載、SNS流入、他配信の終了など、CASPULSEから見えない外的要因があります。
 
-`配信の空気` パネルもv0.1.1ではこの実測値から短いひとことを作るだけで、AI文脈解析ではありません。
+`いまこんな感じ` もv0.1.3では実測値から短いひとことを作るだけで、AI文脈解析ではありません。
 
 詳しくは [`docs/METRICS.md`](docs/METRICS.md)。
 
 ---
+
+# 開発者向け
+
+ここから下は、RepositoryをCloneして開発する人向けです。一般利用者向けSetup.exeでは不要です。
 
 ## 必要なもの
 
 - Windows 10 / 11
 - Node.js `20.19+` または `22.12+`（Node 24推奨）
 - npm
-- TwitCasting Developerアプリ / APIアクセス
+- TwitCasting Developer App
 
 Desktop runtime は Electron `44.2.0` を固定しています。
 
----
-
-## 1. インストール
-
-GitHub DesktopでRepositoryをCloneし、Repositoryフォルダでターミナルを開きます。
+## 1. Clone / Install
 
 ```powershell
 cd "C:\Users\Ryohei\Documents\GitHub\caspulse"
 npm install
 ```
 
-起動：
-
-```powershell
-npm run dev
-```
-
 ---
 
-## 2. ツイキャスとつなぐ
+## 2. 開発ビルドにClient IDを設定
 
-TwitCasting Developerでアプリを登録し、Callback URLを次の値に合わせます。
+TwitCasting DeveloperでCASPULSE用Appを登録します。
+
+Callback URL：
 
 ```text
 http://127.0.0.1:47831/oauth/callback
 ```
 
-CASPULSEを起動したら：
+Repository直下で `.env.example` を参考に `.env.local` を作成します。
 
-1. **設定** を開く
-2. Developerアプリの **Client ID** を貼る
-3. **ツイキャスとつなぐ ✦** を押す
-4. ブラウザ側で許可する
-5. CASPULSEへ戻る
-
-Client SecretはRepositoryへ入れません。アクセストークンもGitへCommitしないでください。
-
-開発確認用として、設定の詳細欄からアクセストークンを直接読み込む方法も残しています。
-
----
-
-## 3. 配信をのぞく
-
-画面上部の **配信URLをぺたっ** に入力します。
-
-```text
-https://twitcasting.tv/g:113456859404992188053
+```env
+CASPULSE_TWITCASTING_CLIENT_ID=あなたのClientID
 ```
 
-または：
+**Client Secretは書かないでください。**
 
-```text
-@screen_id
-screen_id
+`.env.local` はGit管理対象外です。
+
+`npm run dev` / `npm run build` の前に `scripts/generate-oauth-config.mjs` が自動実行され、このClient IDだけを開発ビルドへ埋め込みます。
+
+v0.1.2までにCASPULSEの設定画面からClient IDを保存していた開発環境は、移行互換としてその値も利用できます。埋め込みClient IDがある場合はそちらを優先します。
+
+---
+
+## 3. 開発起動
+
+```powershell
+npm run dev
 ```
 
-**のぞきにいく！** を押します。
+Client ID未設定のソースビルドでは、一般利用者向けのClient ID入力欄は出さず、開発者向けセットアップ案内のみ表示します。
 
-わいわいログには、例えば次のように流れます。
+---
 
-```text
-21:30:01 [ぺたっ]      URLを受け取ったよ：https://twitcasting.tv/...
-21:30:01 [みつけた]    配信者をみつけた！ @screen_id
-21:30:01 [おいかけ]    @screen_id をおいかけるよ！
-21:30:02 [配信きた！]  配信きた！「雑談するよ〜」につながったよ。
-21:30:05 [コメ]        @viewer：こんばんは！
-21:30:10 [ノリ]        いま 18コメ/分 · 勢い +140% · ノリ 72
+## 4. 型チェック / Build
+
+```powershell
+npm run typecheck
+npm run build
 ```
 
-配信が終わったら固定 `user.id` を保持したまま、次の配信を待ちます。
-
----
-
-## ローカルデータ
-
-SQLite DBはRepositoryの中ではなく、Electronのユーザーデータ領域に作成します。
-
-現在のテーブル：
-
-- `tracked_users`
-- `streams`
-- `comments`
-- `metrics`
-- `gifts` — 将来のOwner Mode用
-- `moments` — 将来のハイライト機能用
-- `settings`
-
-DBや将来の録音データは `.gitignore` 対象です。
-
----
-
-## APIポーリング
-
-v0.1.1の基本値：
-
-- 配信状態：**10秒ごと**
-- コメント：配信中 **3秒ごと**
-
-コメントAPIは1回で取得できる件数に上限があるため、非常にコメント量の多い配信では全件を完全取得できない可能性があります。v0.1ではこの制約を隠しません。
-
----
-
-## セキュリティ
-
-- `contextIsolation: true`
-- `nodeIntegration: false`
-- renderer sandbox ON
-- preloadで公開するIPCを限定
-- OAuth tokenは利用可能な環境でElectron `safeStorage` 暗号化
-- Client Secretを埋め込まない
-- `.env` に秘密情報を置く必要なし
-- DBはローカルのみ
-- 外部リンクはTwitCasting / GitHubに限定
-
----
-
-## Roadmap
-
-### v0.2 — あとから見返す
-
-- 配信履歴
-- 手動 / 自動MOMENT
-- コメント・ユーザー検索
-- セッションCSV / JSON出力
-- 高コメント量配信向けの取得方式再検討
-
-### v0.3 — 聴く
-
-- 自分の配信、または録音許可のある配信の録音
-- 音声タイムライン同期
-- TTS詳細設定
-- NGワード / NGユーザー
-
-### v0.4 — 文脈を読む
-
-- 音声文字起こし
-- 配信者発言 + コメントの文脈サマリー
-- 話題の切り替わり
-- AUTO MOMENT
-- 「原因」ではなく観測根拠を添えたピーク説明
-
-### アイテム
-
-Gift APIはアクセストークンに紐づくユーザー宛の直近アイテムが中心になるため、通常の第三者配信ビューアで任意配信のアイテムを取得できるものとしては扱いません。
-
-将来は配信者本人向け **Owner Mode** として実装候補にします。
-
----
-
-## Tech
-
-- Electron 44
-- React 19
-- TypeScript
-- Vite 8
-- Node `node:sqlite`
-- TwitCasting API v2
-- Web Speech API / SpeechSynthesis
-
----
-
-## Windows build
+Windows配布物：
 
 ```powershell
 npm run dist:win
 ```
 
-生成先：
+想定成果物：
 
 ```text
 release/
+├─ CASPULSE-Setup-0.1.3-x64.exe
+└─ CASPULSE-Portable-0.1.3-x64.exe
 ```
 
-CASPULSE専用アプリアイコンは `build/icon.ico` に同梱しています。
+Setup版を一般利用者向けのメイン配布物とします。
 
 ---
 
-## Commit summary
+## 認証設計
+
+CASPULSEはTwitCasting API v2のImplicit OAuthを利用します。
 
 ```text
-Redesign CASPULSE with a playful TwitCasting-first UI, friendly live logs, real stream previews, and a custom app icon
+CASPULSE
+  ↓ Client ID
+TwitCasting OAuth
+  ↓ 利用者が許可
+http://127.0.0.1:47831/oauth/callback
+  ↓ URL fragmentからAccess Token受取
+CASPULSE
+  ↓
+safeStorage
 ```
+
+Client SecretをElectronアプリへ埋め込まない構成です。
+
+---
+
+## ローカルデータ
+
+DBは Electron側のNode `node:sqlite` を利用します。
+
+主なデータ：
+
+- tracked users
+- stream sessions
+- comments
+- stream metrics
+- settings / encrypted token payload
+
+ユーザーデータディレクトリ配下へ保存し、Repositoryへはコミットしません。
+
+---
+
+## Roadmap
+
+### v0.2
+
+- 配信履歴
+- MOMENT / AUTO MOMENT
+- コメント検索 / ユーザー追跡の強化
+- グラフ区間クリック
+
+### v0.3
+
+- 配信音声のローカル録音（権利・許可を前提）
+- コメントと音声タイムライン同期
+- TTSの声 / 速度 / NG設定
+
+### v0.4
+
+- 音声文字起こし
+- 配信者発話 + コメント文脈サマリー
+- 話題区間抽出
+- AUTO MOMENT高度化
+
+---
+
+## Privacy / Safety
+
+- Client SecretをRepositoryへ置かない
+- Access TokenをRepositoryへ置かない
+- `.env.local` はGit管理対象外
+- ログは原則ローカル保存
+- 第三者配信の録音機能を追加する場合は、配信者の権利・著作権・利用条件を確認する
+- 原因を確認できない視聴者増加を「この発言が原因」と断定しない
+
+---
 
 ## License
 
-MIT License
+MIT License. See [`LICENSE`](LICENSE).

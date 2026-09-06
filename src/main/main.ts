@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, safeStorage, shell } from 'electron';
 import type {
   AuthStatus,
   DashboardPayload,
@@ -9,6 +9,7 @@ import type {
   TwitCastingUser,
 } from '../shared/types';
 import { DatabaseService } from './database';
+import { CASPULSE_TWITCASTING_CLIENT_ID } from './generated-oauth-config';
 import { OAUTH_CALLBACK_URL, runImplicitOAuth } from './oauth';
 import { parseTwitCastingTarget } from './target';
 import { TrackerService } from './tracker';
@@ -21,8 +22,11 @@ let tracker: TrackerService;
 let connectedAccount: TwitCastingUser | null = null;
 let sessionToken: string | null = null;
 
-function getStoredClientId(): string {
-  return db.getSetting('oauth.client_id') ?? '';
+function configuredClientId(): string {
+  const embedded = CASPULSE_TWITCASTING_CLIENT_ID.trim();
+  if (embedded) return embedded;
+  // v0.1.2以前に設定済みの開発環境は、そのまま移行できるようにする。
+  return db?.getSetting('oauth.client_id')?.trim() ?? '';
 }
 
 function saveToken(token: string): void {
@@ -56,10 +60,10 @@ function clearToken(): void {
 function authStatus(): AuthStatus {
   return {
     connected: Boolean(connectedAccount),
-    clientId: getStoredClientId(),
     account: connectedAccount,
     callbackUrl: OAUTH_CALLBACK_URL,
     secureStorageAvailable: safeStorage.isEncryptionAvailable(),
+    appClientConfigured: Boolean(configuredClientId()),
   };
 }
 
@@ -116,15 +120,26 @@ function sendTerminal(event: TerminalEvent): void {
   if (!mainWindow?.isDestroyed()) mainWindow?.webContents.send('terminal:event', event);
 }
 
+function clipboardTwitCastingTarget(): string | null {
+  const raw = clipboard.readText().trim();
+  if (!raw || raw.length > 2048 || !/twitcasting\.tv/i.test(raw)) return null;
+  try {
+    return parseTwitCastingTarget(raw).originalInput;
+  } catch {
+    return null;
+  }
+}
+
 function registerIpc(): void {
   ipcMain.handle('app:get-bootstrap', async () => buildDashboard());
   ipcMain.handle('data:get-dashboard', async (_event, userId?: string) => buildDashboard(userId));
 
-  ipcMain.handle('auth:start', async (_event, clientId: string) => {
-    const normalized = String(clientId ?? '').trim();
-    if (!normalized) throw new Error('TwitCasting Client IDを入力してください。');
-    db.setSetting('oauth.client_id', normalized);
-    const token = await runImplicitOAuth(normalized);
+  ipcMain.handle('auth:start', async () => {
+    const clientId = configuredClientId();
+    if (!clientId) {
+      throw new Error('この開発ビルドにはCASPULSEのClient IDがまだ設定されていません。.env.local を設定して再起動してください。');
+    }
+    const token = await runImplicitOAuth(clientId);
     api.setToken(token);
     const account = await api.verifyToken();
     saveToken(token);
@@ -159,14 +174,14 @@ function registerIpc(): void {
   });
 
   ipcMain.handle('tracker:start-input', async (_event, rawInput: string): Promise<StartTrackingResult> => {
-    if (!connectedAccount) throw new Error('先にTwitCastingと連携してください。');
+    if (!connectedAccount) throw new Error('先に「ツイキャスとつなぐ」を押してね。');
     const parsed = parseTwitCastingTarget(String(rawInput ?? ''));
     sendTerminal({
       id: `input-${Date.now()}`,
       at: Math.floor(Date.now() / 1000),
       kind: 'system',
       label: 'INPUT',
-      message: `URLを受け取ったよ：${parsed.originalInput}`,
+      message: `URLをみつけたよ：${parsed.originalInput}`,
     });
     const user = await api.getUser(parsed.screenIdOrUserId);
     const target = db.upsertTrackedUser(user);
@@ -183,9 +198,9 @@ function registerIpc(): void {
   });
 
   ipcMain.handle('tracker:start-user', async (_event, userId: string) => {
-    if (!connectedAccount) throw new Error('先にTwitCastingと連携してください。');
+    if (!connectedAccount) throw new Error('先に「ツイキャスとつなぐ」を押してね。');
     const stored = db.getTrackedUser(String(userId ?? ''));
-    if (!stored) throw new Error('追従履歴に対象ユーザーが見つかりません。');
+    if (!stored) throw new Error('最近つないだ配信に対象ユーザーが見つかりません。');
     const latestIdentity = await api.getUser(stored.userId);
     const target = db.upsertTrackedUser(latestIdentity);
     return tracker.start(target);
@@ -197,6 +212,14 @@ function registerIpc(): void {
     const normalized = String(userId ?? '');
     if (tracker.getStatus().trackedUserId === normalized) tracker.stop();
     db.removeTrackedUser(normalized);
+  });
+
+  ipcMain.handle('clipboard:get-twitcasting-target', async () => clipboardTwitCastingTarget());
+
+  ipcMain.handle('thumbnail:get-live', async (_event, userId: string) => {
+    const normalized = String(userId ?? '').trim();
+    if (!normalized || normalized.length > 180) return null;
+    return api.getLiveThumbnailDataUrl(normalized);
   });
 
   ipcMain.handle('open:external', async (_event, rawUrl: string) => {
@@ -213,11 +236,11 @@ function registerIpc(): void {
 
 async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
-    width: 1480,
-    height: 940,
-    minWidth: 1080,
-    minHeight: 720,
-    backgroundColor: '#101735',
+    width: 1540,
+    height: 980,
+    minWidth: 1120,
+    minHeight: 760,
+    backgroundColor: '#0d1230',
     title: 'CASPULSE',
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),

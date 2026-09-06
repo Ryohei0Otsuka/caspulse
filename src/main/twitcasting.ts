@@ -66,6 +66,16 @@ export class TwitCastingClient {
     }
   }
 
+  async getLiveThumbnailDataUrl(userId: string): Promise<string | null> {
+    const id = encodeURIComponent(userId.trim());
+    const response = await fetch(`${BASE_URL}/users/${id}/live/thumbnail?size=large&position=latest`);
+    if (!response.ok) return null;
+    const contentType = response.headers.get('content-type') ?? 'image/jpeg';
+    if (!contentType.startsWith('image/')) return null;
+    const bytes = Buffer.from(await response.arrayBuffer());
+    return `data:${contentType};base64,${bytes.toString('base64')}`;
+  }
+
   async getComments(movieId: string, sliceId?: string): Promise<CommentsResponse> {
     const params = new URLSearchParams({ limit: '50' });
     if (sliceId) params.set('slice_id', sliceId);

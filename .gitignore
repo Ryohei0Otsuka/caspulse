@@ -32,3 +32,5 @@ Thumbs.db
 *.sqlite-wal
 recordings/
 exports/
+.env.local
+.env.*.local

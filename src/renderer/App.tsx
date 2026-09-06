@@ -10,15 +10,16 @@ import type {
 } from '../shared/types';
 
 const EXAMPLE_URL = 'https://twitcasting.tv/g:113456859404992188053';
+const THUMBNAIL_REFRESH_MS = 20_000;
 
 const emptyDashboard: DashboardPayload = {
   trackedUsers: [],
   auth: {
     connected: false,
-    clientId: '',
     account: null,
-    callbackUrl: '',
+    callbackUrl: 'http://127.0.0.1:47831/oauth/callback',
     secureStorageAvailable: true,
+    appClientConfigured: false,
   },
   tracker: {
     trackedUserId: null,
@@ -72,11 +73,11 @@ function vibeWord(value: number): string {
 }
 
 function activityWord(value: number): string {
-  if (value >= 85) return 'お祭り！';
+  if (value >= 85) return 'お祭りみたい！';
   if (value >= 65) return 'かなりわいわい';
   if (value >= 40) return 'いいノリ';
-  if (value >= 15) return 'じわじわ';
-  return 'のんびり';
+  if (value >= 15) return 'じわじわきてる';
+  return 'のんびりタイム';
 }
 
 function cleanForSpeech(message: string): string {
@@ -105,7 +106,7 @@ function pointsFor(values: number[], width: number, height: number): string {
   const range = Math.max(1, max - min);
   return values.map((value, index) => {
     const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
-    const y = height - ((value - min) / range) * (height - 24) - 12;
+    const y = height - ((value - min) / range) * (height - 28) - 14;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
 }
@@ -114,11 +115,8 @@ function MultiPulseChart({ metrics }: { metrics: StreamMetric[] }) {
   const width = 860;
   const height = 240;
   const last = metrics.slice(-80);
-  const viewers = last.map((metric) => metric.currentViewers);
-  const comments = last.map((metric) => metric.commentsPerMinute);
-  const viewersPoints = pointsFor(viewers, width, height);
-  const commentsPoints = pointsFor(comments, width, height);
-
+  const viewersPoints = pointsFor(last.map((metric) => metric.currentViewers), width, height);
+  const commentsPoints = pointsFor(last.map((metric) => metric.commentsPerMinute), width, height);
   const latest = last.at(-1);
   const peak = last.reduce<StreamMetric | null>((best, metric) => {
     if (!best || metric.activityScore > best.activityScore) return metric;
@@ -126,7 +124,7 @@ function MultiPulseChart({ metrics }: { metrics: StreamMetric[] }) {
   }, null);
 
   return (
-    <div className="pulse-board">
+    <article className="pulse-board sticker-card">
       <div className="pulse-board-head">
         <div>
           <div className="section-kicker">〰 みんなの声が、波になる。</div>
@@ -141,6 +139,7 @@ function MultiPulseChart({ metrics }: { metrics: StreamMetric[] }) {
 
       {last.length < 2 ? (
         <div className="pulse-empty">
+          <div className="empty-wave">⌁⌁⌁</div>
           <strong>まだ波はしずか。</strong>
           <span>配信につながると、ここにコメントと視聴者の波が出てくるよ。</span>
         </div>
@@ -149,12 +148,12 @@ function MultiPulseChart({ metrics }: { metrics: StreamMetric[] }) {
           <svg className="pulse-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-label="いまの盛り上がり">
             <defs>
               <linearGradient id="viewer-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#47dff2" stopOpacity=".30" />
-                <stop offset="100%" stopColor="#47dff2" stopOpacity="0" />
+                <stop offset="0%" stopColor="#45e7ff" stopOpacity=".30" />
+                <stop offset="100%" stopColor="#45e7ff" stopOpacity="0" />
               </linearGradient>
               <linearGradient id="comment-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ff67d4" stopOpacity=".26" />
-                <stop offset="100%" stopColor="#ff67d4" stopOpacity="0" />
+                <stop offset="0%" stopColor="#ff71d7" stopOpacity=".28" />
+                <stop offset="100%" stopColor="#ff71d7" stopOpacity="0" />
               </linearGradient>
             </defs>
             {[0.2, 0.4, 0.6, 0.8].map((ratio) => (
@@ -177,9 +176,10 @@ function MultiPulseChart({ metrics }: { metrics: StreamMetric[] }) {
               <span>勢い +{latest.momentum}%</span>
             </div>
           )}
+          <div className="chart-doodle">みんなの声が<br />波になる！♡</div>
         </div>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -187,7 +187,7 @@ function atmosphereLines(metric: StreamMetric | null, isLive: boolean): Array<{ 
   if (!isLive) {
     return [
       { icon: '🌙', text: 'いまは配信待ち。次の配信をのんびり待ってるよ。' },
-      { icon: '🔗', text: 'URLをつないでおけば、同じ人の次回配信も追いかける。' },
+      { icon: '🔗', text: '一度つないだ人は、固定IDで次回も追いかける。' },
       { icon: '💾', text: 'コメントや波の記録は、このPCの中に保存。' },
     ];
   }
@@ -239,9 +239,9 @@ export function App() {
   const [dashboard, setDashboard] = useState<DashboardPayload>(emptyDashboard);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [targetInput, setTargetInput] = useState('');
-  const [clientId, setClientId] = useState('');
   const [manualToken, setManualToken] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [terminal, setTerminal] = useState<TerminalEvent[]>([]);
@@ -249,21 +249,24 @@ export function App() {
   const [autoScroll, setAutoScroll] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [ttsIncludeName, setTtsIncludeName] = useState(false);
+  const [clipboardCandidate, setClipboardCandidate] = useState<string | null>(null);
+  const [liveThumbnail, setLiveThumbnail] = useState<string | null>(null);
   const terminalEndRef = useRef<HTMLDivElement | null>(null);
 
   const refresh = async (userId?: string) => {
     const data = await window.caspulse.getDashboard(userId);
     setDashboard(data);
-    setClientId(data.auth.clientId);
     if (data.selectedUser) setSelectedUserId(data.selectedUser.userId);
   };
 
   useEffect(() => {
     void window.caspulse.getBootstrap().then((data) => {
       setDashboard(data);
-      setClientId(data.auth.clientId);
       setSelectedUserId(data.selectedUser?.userId ?? null);
-    }).catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+      setOnboardingOpen(!data.auth.connected);
+      return window.caspulse.getClipboardTwitCastingTarget();
+    }).then((candidate) => setClipboardCandidate(candidate))
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
 
     const offTracker = window.caspulse.onTrackerUpdate((update: TrackerUpdate) => {
       setDashboard((current) => {
@@ -280,10 +283,7 @@ export function App() {
         }
 
         const nextTrackedUsers = update.trackedUser
-          ? [
-              update.trackedUser,
-              ...current.trackedUsers.filter((user) => user.userId !== update.trackedUser?.userId),
-            ]
+          ? [update.trackedUser, ...current.trackedUsers.filter((user) => user.userId !== update.trackedUser?.userId)]
           : current.trackedUsers;
 
         return {
@@ -314,9 +314,7 @@ export function App() {
 
   useEffect(() => {
     if (!selectedUserId) return;
-    void refresh(selectedUserId).catch((err: unknown) => {
-      setError(err instanceof Error ? err.message : String(err));
-    });
+    void refresh(selectedUserId).catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
   }, [selectedUserId]);
 
   const latestMetric = dashboard.metrics.at(-1) ?? null;
@@ -328,13 +326,44 @@ export function App() {
   );
   const live = Boolean(trackingSelected && dashboard.tracker.isLive && dashboard.liveMovie);
 
+  useEffect(() => {
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const updateThumbnail = async () => {
+      if (!live || !selectedUser?.userId) {
+        if (!cancelled) setLiveThumbnail(null);
+        return;
+      }
+
+      // current_live already contains movie thumbnails. Show that immediately,
+      // then replace it with the official latest live-thumbnail endpoint.
+      const movieFallback = dashboard.liveMovie?.large_thumbnail || dashboard.liveMovie?.small_thumbnail || null;
+      if (!cancelled && movieFallback) setLiveThumbnail(movieFallback.replace(/^http:/, 'https:'));
+
+      try {
+        const image = await window.caspulse.getLiveThumbnail(selectedUser.userId);
+        if (!cancelled && image) setLiveThumbnail(image);
+      } catch {
+        // Keep the current_live movie thumbnail if the refresh endpoint fails.
+      }
+    };
+
+    void updateThumbnail();
+    if (live) timer = window.setInterval(() => void updateThumbnail(), THUMBNAIL_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearInterval(timer);
+    };
+  }, [live, dashboard.liveMovie?.id, selectedUser?.userId]);
+
   const filteredTerminal = useMemo(() => {
     const query = terminalFilter.trim().toLowerCase();
     if (!query) return terminal;
     return terminal.filter((line) => `${line.label} ${line.message} ${line.detail ?? ''}`.toLowerCase().includes(query));
   }, [terminal, terminalFilter]);
 
-  const recentComments = dashboard.comments.slice(-10).reverse();
+  const recentComments = dashboard.comments.slice(-11).reverse();
   const atmosphere = atmosphereLines(latestMetric, live);
 
   const runAction = async (action: () => Promise<void>) => {
@@ -352,7 +381,7 @@ export function App() {
   const handleTrace = (event: FormEvent) => {
     event.preventDefault();
     if (!dashboard.auth.connected) {
-      setSettingsOpen(true);
+      setOnboardingOpen(true);
       return;
     }
     void runAction(async () => {
@@ -360,6 +389,7 @@ export function App() {
       setDashboard(result.dashboard);
       setSelectedUserId(result.target.userId);
       setTargetInput(`https://twitcasting.tv/${result.target.screenId}`);
+      setClipboardCandidate(null);
     });
   };
 
@@ -381,9 +411,10 @@ export function App() {
 
   const connectOAuth = () => {
     void runAction(async () => {
-      const auth = await window.caspulse.authStart(clientId);
+      const auth = await window.caspulse.authStart();
       setDashboard((current) => ({ ...current, auth }));
       setManualToken('');
+      setOnboardingOpen(false);
       setSettingsOpen(false);
     });
   };
@@ -393,6 +424,7 @@ export function App() {
       const auth = await window.caspulse.authImportToken(manualToken);
       setDashboard((current) => ({ ...current, auth }));
       setManualToken('');
+      setOnboardingOpen(false);
       setSettingsOpen(false);
     });
   };
@@ -406,6 +438,7 @@ export function App() {
         tracker: { ...current.tracker, isRunning: false, isLive: false, activeMovieId: null },
         liveMovie: null,
       }));
+      setOnboardingOpen(true);
     });
   };
 
@@ -419,7 +452,7 @@ export function App() {
   };
 
   const openStream = () => {
-    if (dashboard.liveMovie?.link) void window.caspulse.openExternal(dashboard.liveMovie.link);
+    if (dashboard.liveMovie?.link) void window.caspulse.openExternal(dashboard.liveMovie.link.replace(/^http:/, 'https:'));
     else if (selectedUser) void window.caspulse.openExternal(`https://twitcasting.tv/${selectedUser.screenId}`);
   };
 
@@ -428,10 +461,11 @@ export function App() {
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
       <div className="ambient ambient-three" />
+      <div className="sparkles" aria-hidden="true">✦　·　♡　✧　·　✦</div>
 
       <header className="topbar">
         <div className="brand-wrap">
-          <img className="brand-icon" src="/assets/caspulse-icon.png" alt="CASPULSE" />
+          <img className="brand-icon" src="./assets/caspulse-icon.png" alt="CASPULSE" />
           <div className="brand-copy">
             <div className="brand-line"><h1>CASPULSE</h1><span className="heartbeat">⌁</span></div>
             <p>ツイキャスの“いま”を、いっしょに楽しもう。</p>
@@ -440,67 +474,91 @@ export function App() {
         </div>
 
         <nav className="nav-tabs" aria-label="CASPULSE navigation">
-          <button className="nav-tab active">⌂ <span>ホーム</span></button>
-          <button className="nav-tab soon" title="v0.2で追加予定">◷ <span>履歴</span><small>soon</small></button>
-          <button className="nav-tab" onClick={() => setSettingsOpen(true)}>⚙ <span>設定</span></button>
+          <button type="button" className="nav-tab active">⌂ <span>ホーム</span></button>
+          <button type="button" className="nav-tab soon" title="これから追加予定">◷ <span>履歴</span><small>soon</small></button>
+          <button type="button" className="nav-tab" onClick={() => setSettingsOpen(true)}>⚙ <span>設定</span></button>
         </nav>
 
         <div className="top-message">
           <span>好きな配信が、</span>
           <b>もっと好きになる。♡</b>
           <small className={dashboard.auth.connected ? 'connected' : ''}>
-            {dashboard.auth.connected ? `● @${dashboard.auth.account?.screen_id} と接続中` : '○ APIはまだつながってないよ'}
+            {dashboard.auth.connected ? `● @${dashboard.auth.account?.screen_id} とつながってる` : '○ まずはツイキャスとつなごう'}
           </small>
         </div>
       </header>
 
       <main className="page-wrap">
-        <form className="url-hero" onSubmit={handleTrace}>
-          <div className="url-label">🔗 <b>配信URLをぺたっ</b><span> ฅ^•ﻌ•^ฅ</span></div>
-          <div className="url-input-shell">
-            <span className="link-mark">↗</span>
-            <input
-              value={targetInput}
-              onChange={(event) => setTargetInput(event.target.value)}
-              placeholder={EXAMPLE_URL}
-              disabled={busy}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            {targetInput && <button type="button" className="clear-input" onClick={() => setTargetInput('')} aria-label="入力を消す">×</button>}
-          </div>
-          {dashboard.tracker.isRunning ? (
-            <button type="button" className="peek-button stop" onClick={stopTrace} disabled={busy}>
-              <span className="peek-cat">zzz</span>
-              <span>いったん休む</span>
-            </button>
-          ) : (
-            <button type="submit" className="peek-button" disabled={busy || !targetInput.trim()}>
-              <span className="peek-cat">ฅ</span>
-              <span>{busy ? 'つないでる…' : 'のぞきにいく！'}</span>
-              <i>✦</i>
-            </button>
-          )}
-        </form>
+        <section className="hero-wrap">
+          <form className="url-hero" onSubmit={handleTrace}>
+            <div className="url-label">🔗 <b>配信URLをぺたっ</b><span> ฅ^•ﻌ•^ฅ</span></div>
+            <div className="url-input-shell">
+              <span className="link-mark">↗</span>
+              <input
+                value={targetInput}
+                onChange={(event) => setTargetInput(event.target.value)}
+                placeholder={EXAMPLE_URL}
+                disabled={busy}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {targetInput && <button type="button" className="clear-input" onClick={() => setTargetInput('')} aria-label="入力を消す">×</button>}
+            </div>
+            {dashboard.tracker.isRunning ? (
+              <button type="button" className="peek-button stop" onClick={stopTrace} disabled={busy}>
+                <span className="peek-cat">zzz</span>
+                <span>いったん休む</span>
+              </button>
+            ) : (
+              <button type="submit" className="peek-button" disabled={busy || !targetInput.trim()}>
+                <span className="peek-cat">ฅ</span>
+                <span>{busy ? 'つないでる…' : 'のぞきにいく！'}</span>
+                <i>✦</i>
+              </button>
+            )}
+          </form>
+          <div className="hero-note">推しの配信を<br /><b>つないでみよう！</b><span>↙</span></div>
+        </section>
+
+        <div className="vibe-ribbon" aria-hidden="true">
+          <span>✦ コメントが流れる</span>
+          <span>♡ 配信の波が見える</span>
+          <span>⌁ 盛り上がりをあとから振り返れる</span>
+          <i>CASPULSEは、配信の横に置く小さな相棒。</i>
+        </div>
+
+        {clipboardCandidate && !targetInput && (
+          <button type="button" className="clipboard-toast" onClick={() => {
+            setTargetInput(clipboardCandidate);
+            setClipboardCandidate(null);
+          }}>
+            <span>📎</span><div><b>ツイキャスのURLみつけた！</b><small>クリップボードから入れる</small></div><em>これを見る →</em>
+          </button>
+        )}
 
         {error && (
           <div className="error-banner">
             <span className="error-face">( ; ᯅ ; )</span>
             <div><b>うまくつながらなかった。</b><span>{error}</span></div>
-            <button onClick={() => setError(null)}>×</button>
+            <button type="button" onClick={() => setError(null)}>×</button>
           </div>
         )}
 
         <section className="dashboard-grid">
           <aside className="left-rail">
-            <article className={`stream-card ${live ? 'is-live' : ''}`}>
+            <article className={`stream-card sticker-card ${live ? 'is-live' : ''}`}>
               <div className="stream-card-head">
-                <span className="live-badge">{live ? '◉ ただいま配信中！' : dashboard.tracker.isRunning ? '☾ 次の配信まち' : '☆ まだつないでないよ'}</span>
+                <span className="live-badge">{live ? '● ただいま配信中！' : dashboard.tracker.isRunning ? '☾ 次の配信まち' : '☆ まだつないでないよ'}</span>
                 <time>{live && dashboard.liveMovie ? durationText(dashboard.liveMovie.duration) : '--:--:--'}</time>
               </div>
               <div className="stream-visual">
-                {live && dashboard.liveMovie?.large_thumbnail ? (
-                  <img src={dashboard.liveMovie.large_thumbnail} alt="配信サムネイル" />
+                {live && liveThumbnail ? (
+                  <>
+                    <img src={liveThumbnail} alt={`${selectedUser?.name ?? ''}の配信サムネイル`} />
+                    <div className="thumbnail-shine" />
+                    <span className="thumbnail-live">LIVE</span>
+                    <span className="thumbnail-note">いま、この瞬間。<br />ちゃんとここに。♡</span><span className="thumbnail-sticker">LIVE NOW ✦</span>
+                  </>
                 ) : selectedUser?.image ? (
                   <div className="offline-portrait">
                     <img src={selectedUser.image} alt="" />
@@ -508,7 +566,7 @@ export function App() {
                   </div>
                 ) : (
                   <div className="empty-stream-art">
-                    <div className="big-cat">ᓚᘏᗢ</div>
+                    <img src="./assets/caspulse-icon.png" alt="" />
                     <b>配信をつないでみよう</b>
                     <span>URLを上にぺたっと貼るだけ。</span>
                   </div>
@@ -520,33 +578,27 @@ export function App() {
                   <>
                     <img src={selectedUser.image} alt="" />
                     <div><b>{selectedUser.name}</b><span>@{selectedUser.screenId}</span></div>
-                    <button onClick={openStream} title="ツイキャスで開く">↗</button>
+                    <button type="button" onClick={openStream} title="ツイキャスで開く">↗</button>
                   </>
-                ) : (
-                  <div className="no-person">まだ誰もおいかけてないよ。</div>
-                )}
+                ) : <div className="no-person">まだ誰もおいかけてないよ。</div>}
               </div>
               {selectedUser && (
                 <div className="stream-tags">
-                  <span>uid:{selectedUser.userId}</span>
-                  <span>{live ? 'LIVE' : 'WAITING'}</span>
-                  {dashboard.liveMovie && <span>movie:{dashboard.liveMovie.id}</span>}
+                  <span>{live ? '配信中' : '待機中'}</span>
+                  <span>固定IDでおいかけ</span>
+                  {dashboard.liveMovie?.subtitle && <span>{dashboard.liveMovie.subtitle}</span>}
                 </div>
               )}
             </article>
 
-            <article className="comments-card">
+            <article className="comments-card sticker-card">
               <div className="card-title-row">
-                <h3>💬 コメントながれ</h3>
+                <div><span className="section-kicker">みんなの声、ながれてく。</span><h3>💬 コメントながれ</h3></div>
                 <span>{dashboard.comments.length ? `${dashboard.comments.length}件` : 'まだ静か'}</span>
               </div>
               <div className="comment-list">
                 {recentComments.length === 0 ? (
-                  <div className="comments-empty">
-                    <span>☁</span>
-                    <b>コメント待ち。</b>
-                    <small>配信につながると、ここにふわっと流れてくるよ。</small>
-                  </div>
+                  <div className="comments-empty"><span>☁</span><b>コメント待ち。</b><small>配信につながると、ここにふわっと流れてくるよ。</small></div>
                 ) : recentComments.map((comment) => (
                   <div className="comment-row" key={comment.commentId}>
                     <img src={comment.image} alt="" />
@@ -562,35 +614,35 @@ export function App() {
 
           <section className="center-stage">
             <div className="metric-row">
-              <article className="metric-card cyan">
+              <article className="metric-card cyan sticker-card">
                 <div className="metric-icon">👥</div>
                 <div><span>見てる人</span><strong>{latestMetric ? compactNumber(latestMetric.currentViewers) : '—'}</strong></div>
                 <small>{latestMetric ? `${latestMetric.viewerDelta >= 0 ? '↑ +' : '↓ '}${latestMetric.viewerDelta} / 10秒` : 'つながると見えるよ'}</small>
-                <em>{latestMetric?.viewerDelta && latestMetric.viewerDelta > 0 ? 'わーい！' : 'ちらっ'}</em>
+                <em>{latestMetric?.viewerDelta && latestMetric.viewerDelta > 0 ? 'わーい！' : 'ちらっ'}</em><i className="metric-doodle">✦</i>
               </article>
-              <article className="metric-card pink">
+              <article className="metric-card pink sticker-card">
                 <div className="metric-icon">💬</div>
                 <div><span>コメ / 分</span><strong>{latestMetric ? latestMetric.commentsPerMinute : '—'}</strong></div>
                 <small>{latestMetric ? `${latestMetric.uniqueCommenters}人が参加中` : 'コメントの流れ'}</small>
-                <em>{latestMetric && latestMetric.commentsPerMinute >= 20 ? 'コメ多い！' : 'ゆるゆる'}</em>
+                <em>{latestMetric && latestMetric.commentsPerMinute >= 20 ? 'コメ多い！' : 'ゆるゆる'}</em><i className="metric-doodle">♡</i>
               </article>
-              <article className="metric-card yellow">
+              <article className="metric-card yellow sticker-card">
                 <div className="metric-icon">🔥</div>
                 <div><span>勢い</span><strong>{latestMetric ? `${latestMetric.momentum >= 0 ? '+' : ''}${latestMetric.momentum}%` : '—'}</strong></div>
                 <small>{latestMetric ? vibeWord(latestMetric.momentum) : '次の波は？'}</small>
-                <em>{latestMetric && latestMetric.momentum >= 100 ? 'きてる！' : 'ふわっ'}</em>
+                <em>{latestMetric && latestMetric.momentum >= 100 ? 'きてる！' : 'ふわっ'}</em><i className="metric-doodle">↗</i>
               </article>
-              <article className="metric-card mint">
+              <article className="metric-card mint sticker-card">
                 <div className="metric-icon">📡</div>
                 <div><span>いま</span><strong>{live ? '配信中！' : dashboard.tracker.isRunning ? '待ってる' : 'READY'}</strong></div>
-                <small>{live ? 'みんなでわいわい中！' : dashboard.tracker.isRunning ? '次の配信を見張り中' : 'URLぺたっで開始'}</small>
-                <em>{live ? '♡' : 'zzz'}</em>
+                <small>{live ? 'みんなでわいわい中！' : dashboard.tracker.isRunning ? '次の配信を見守り中' : 'URLぺたっで開始'}</small>
+                <em>{live ? '♡' : 'zzz'}</em><i className="metric-doodle">⌁</i>
               </article>
             </div>
 
             <MultiPulseChart metrics={dashboard.metrics} />
 
-            <article className="terminal-section">
+            <article className="terminal-section sticker-card">
               <div className="terminal-head">
                 <div className="terminal-title">
                   <span className="terminal-prompt">&gt;_</span>
@@ -605,14 +657,11 @@ export function App() {
               <div className="terminal-tools">
                 <span>ฅ 配信をいっしょに見てるよ。</span>
                 <input value={terminalFilter} onChange={(event) => setTerminalFilter(event.target.value)} placeholder="ログをさがす…" />
-                <button onClick={() => setTerminal([])}>おそうじ</button>
+                <button type="button" onClick={() => setTerminal([])}>おそうじ</button>
               </div>
               <div className="terminal-body">
                 {filteredTerminal.length === 0 && (
-                  <div className="terminal-placeholder">
-                    <b>CASPULSE&gt;</b> ここはまだ静か。<br />
-                    <span>URLをぺたっとして「のぞきにいく！」を押してみてね。</span>
-                  </div>
+                  <div className="terminal-placeholder"><b>CASPULSE&gt;</b> ここはまだ静か。<br /><span>URLをぺたっとして「のぞきにいく！」を押してみてね。</span></div>
                 )}
                 {filteredTerminal.map((line) => (
                   <div className={`terminal-line kind-${line.kind}`} key={line.id}>
@@ -629,32 +678,27 @@ export function App() {
           </section>
 
           <aside className="right-rail">
-            <article className="mood-card">
+            <article className="mood-card sticker-card">
               <div className="card-title-row mood-title">
-                <div><span>✦ 配信の空気</span><h3>いまこんな感じ</h3></div>
-                <span className="beta-pill">v0.1</span>
+                <div><span className="section-kicker">数字から、そっと。</span><h3>✦ いまこんな感じ</h3></div>
+                <span className="beta-pill">そっと観測中</span>
               </div>
               <div className="mood-speech">
-                <div className="mini-bot">◉‿◉</div>
+                <img src="./assets/caspulse-icon.png" alt="" />
                 <p>{live && latestMetric
-                  ? `${activityWord(latestMetric.activityScore)}。数字から“いま”をそっと見てるよ。`
+                  ? `${activityWord(latestMetric.activityScore)}。いまの配信の空気を見てるよ。`
                   : dashboard.tracker.isRunning
                     ? '次の配信を待ちながら、ここで見守ってるよ。'
                     : '配信をつなぐと、ここの空気も動き出すよ。'}</p>
               </div>
               <div className="mood-lines">
-                {atmosphere.map((line, index) => (
-                  <div key={`${line.icon}-${index}`}><span>{line.icon}</span><p>{line.text}</p></div>
-                ))}
+                {atmosphere.map((line, index) => <div key={`${line.icon}-${index}`}><span>{line.icon}</span><p>{line.text}</p></div>)}
               </div>
-              <div className="mood-note">※ v0.1は実測値のひとこと。AI文脈まとめはこれから育てる。♡</div>
+              <div className="mood-note">いまは数字からそっと見てるだけ。AIで文脈まで読めるようになるのは、もう少し先。♡</div>
             </article>
 
-            <article className="recent-card">
-              <div className="card-title-row">
-                <h3>🐾 最近つないだ配信</h3>
-                <span>{dashboard.trackedUsers.length}</span>
-              </div>
+            <article className="recent-card sticker-card">
+              <div className="card-title-row"><h3>🐾 最近つないだ配信</h3><span>{dashboard.trackedUsers.length}</span></div>
               <div className="recent-list">
                 {dashboard.trackedUsers.length === 0 ? (
                   <div className="recent-empty">まだないよ。最初のURLをぺたっとどうぞ。</div>
@@ -662,25 +706,21 @@ export function App() {
                   const active = dashboard.tracker.trackedUserId === user.userId && dashboard.tracker.isRunning;
                   return (
                     <div className={`recent-user ${user.userId === selectedUserId ? 'selected' : ''}`} key={user.userId}>
-                      <button className="recent-main" onClick={() => startRecent(user)} disabled={busy || !dashboard.auth.connected}>
+                      <button type="button" className="recent-main" onClick={() => startRecent(user)} disabled={busy || !dashboard.auth.connected}>
                         <img src={user.image} alt="" />
                         <span><b>{user.name}</b><small>@{user.screenId}</small></span>
                         {active && <i>●</i>}
                       </button>
-                      <button className="remove-recent" onClick={() => removeRecent(user)} title="履歴から外す">×</button>
+                      <button type="button" className="remove-recent" onClick={() => removeRecent(user)} title="履歴から外す">×</button>
                     </div>
                   );
                 })}
               </div>
             </article>
 
-            <article className="cozy-card">
+            <article className="cozy-card sticker-card">
               <div className="cozy-sign">すきな時間を<br /><b>いっしょに。♡</b></div>
-              <div className="cozy-art">
-                <span className="headphones">🎧</span>
-                <span className="cozy-cat">ᓚᘏᗢ</span>
-                <span className="mug">☕</span>
-              </div>
+              <div className="cozy-art"><span className="headphones">🎧</span><img src="./assets/caspulse-icon.png" alt="" /><span className="mug">☕</span></div>
               <p>ツイキャスでつながる、<br />みんなのたのしい居場所。</p>
               <b className="cozy-brand">CASPULSE⌁</b>
             </article>
@@ -688,48 +728,69 @@ export function App() {
         </section>
       </main>
 
+      {onboardingOpen && !dashboard.auth.connected && (
+        <div className="onboarding-backdrop">
+          <section className="onboarding-card" role="dialog" aria-modal="true" aria-label="CASPULSE welcome">
+            <button type="button" className="onboarding-close" onClick={() => setOnboardingOpen(false)}>×</button>
+            <div className="welcome-glow" />
+            <img className="welcome-icon" src="./assets/caspulse-icon.png" alt="" />
+            <span className="welcome-kicker">HELLO, STREAM!</span>
+            <h2>ようこそ、CASPULSEへ。</h2>
+            <p className="welcome-copy">好きな配信を、<b>もうちょっと近くで。</b><br />最初にツイキャスとつなぐだけ。</p>
+            <div className="welcome-steps">
+              <span><b>1</b> ツイキャスとつなぐ</span>
+              <span><b>2</b> URLをぺたっ</span>
+              <span><b>3</b> のぞきにいく！</span>
+            </div>
+            {dashboard.auth.appClientConfigured ? (
+              <button type="button" className="connect-big" onClick={connectOAuth} disabled={busy}>
+                <span>♡</span>{busy ? 'つないでる…' : 'ツイキャスとつなぐ'}<i>✦</i>
+              </button>
+            ) : (
+              <div className="dev-build-card">
+                <b>🛠 このソース版は、まだ開発者設定が空っぽ。</b>
+                <p>Repository直下に <code>.env.local</code> を作って、CASPULSE用Client IDを1行だけ設定してね。</p>
+                <code>CASPULSE_TWITCASTING_CLIENT_ID=あなたのClientID</code>
+                <small>Client Secretは入れない。公開版Setup.exeでは、この表示自体が出ない設計。</small>
+              </div>
+            )}
+            <p className="welcome-note">CASPULSEが勝手にコメント投稿や配信をすることはありません。</p>
+          </section>
+        </div>
+      )}
+
       {settingsOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setSettingsOpen(false);
         }}>
           <section className="settings-modal" role="dialog" aria-modal="true" aria-label="CASPULSE settings">
             <div className="modal-head">
-              <div><span className="modal-kicker">⚙ まずはここだけ</span><h2>ツイキャスとつなぐ</h2></div>
-              <button onClick={() => setSettingsOpen(false)}>×</button>
+              <div><span className="modal-kicker">⚙ ちょこっと設定</span><h2>CASPULSEの設定</h2></div>
+              <button type="button" onClick={() => setSettingsOpen(false)}>×</button>
             </div>
 
-            <div className="settings-guide">
-              <span>1</span><p>TwitCasting Developerでアプリを作る</p>
-              <span>2</span><p>Client IDをここに貼る</p>
-              <span>3</span><p>「ツイキャスとつなぐ」を押す</p>
+            <div className="connection-card">
+              <div className={`connection-orb ${dashboard.auth.connected ? 'online' : ''}`}>{dashboard.auth.connected ? '✓' : '○'}</div>
+              <div><b>{dashboard.auth.connected ? 'ツイキャスとつながってるよ' : 'まだツイキャスとつながってないよ'}</b><span>{dashboard.auth.connected ? `@${dashboard.auth.account?.screen_id}` : '初回だけ連携すればOK'}</span></div>
+              {!dashboard.auth.connected && dashboard.auth.appClientConfigured && <button type="button" onClick={connectOAuth} disabled={busy}>つなぐ ✦</button>}
+              {dashboard.auth.connected && <button type="button" className="disconnect-button" onClick={disconnect}>つながりを切る</button>}
             </div>
 
-            <div className="settings-block">
-              <label>CLIENT ID</label>
-              <input value={clientId} onChange={(event) => setClientId(event.target.value)} placeholder="TwitCasting Developer Client ID" />
-              <p>Callback URL はこれに合わせてね。</p>
-              <code className="callback-code">{dashboard.auth.callbackUrl || 'http://127.0.0.1:47831/oauth/callback'}</code>
-              <button className="primary-wide" onClick={connectOAuth} disabled={busy || !clientId.trim()}>
-                {busy ? 'つないでる…' : 'ツイキャスとつなぐ ✦'}
-              </button>
-            </div>
+            <div className="simple-setting-row"><div><b>💬 コメント読み上げ</b><span>ホーム画面の「読み上げ」でON/OFFできるよ。</span></div><span className="setting-value">{ttsEnabled ? 'ON' : 'OFF'}</span></div>
+            <div className="simple-setting-row"><div><b>💾 保存</b><span>コメントと盛り上がり記録はローカルSQLite。</span></div><span className="setting-value">LOCAL</span></div>
+
+            {!dashboard.auth.secureStorageAvailable && <div className="storage-warning">OSの安全な暗号化ストレージが使えないため、Access Tokenは再起動後に残さないよ。</div>}
 
             <details className="advanced-settings">
-              <summary>開発用：アクセストークンを直接入れる</summary>
-              <p>開発確認用。保存時はElectron safeStorageで暗号化するよ。</p>
+              <summary>開発者向け</summary>
+              <p>通常利用では開かなくてOK。公開版はClient IDをビルド時に同梱する。</p>
+              <div className="dev-info-row"><span>Client ID</span><b>{dashboard.auth.appClientConfigured ? 'このビルドに設定済み' : '未設定'}</b></div>
+              <div className="dev-info-row"><span>Callback</span><code>{dashboard.auth.callbackUrl}</code></div>
+              <label>Access Tokenを直接確認する場合だけ</label>
               <input type="password" value={manualToken} onChange={(event) => setManualToken(event.target.value)} placeholder="access_token" />
-              <button className="ghost-wide" onClick={importToken} disabled={busy || !manualToken.trim()}>確認して保存</button>
+              <button type="button" className="ghost-wide" onClick={importToken} disabled={busy || !manualToken.trim()}>確認して保存</button>
+              <small>Client SecretはCASPULSEへ入力しない・配布しない。</small>
             </details>
-
-            <div className="settings-foot">
-              <span className={dashboard.auth.connected ? 'connected-text' : ''}>
-                {dashboard.auth.connected ? `@${dashboard.auth.account?.screen_id} とつながってるよ` : 'まだつながってないよ'}
-              </span>
-              {dashboard.auth.connected && <button className="danger-link" onClick={disconnect}>つながりを切る</button>}
-            </div>
-            {!dashboard.auth.secureStorageAvailable && (
-              <div className="storage-warning">OSの安全な暗号化ストレージが使えないため、トークンは再起動後に残さないよ。</div>
-            )}
           </section>
         </div>
       )}
