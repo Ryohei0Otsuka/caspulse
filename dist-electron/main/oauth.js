@@ -14,7 +14,7 @@ exports.OAUTH_CALLBACK_URL = `http://${HOST}:${PORT}/oauth/callback`;
 async function runImplicitOAuth(clientId) {
     const trimmedClientId = clientId.trim();
     if (!trimmedClientId)
-        throw new Error('Client IDを入力してください。');
+        throw new Error('CASPULSEのOAuth設定を取得できませんでした。');
     const state = (0, node_crypto_1.randomBytes)(24).toString('hex');
     let timeout;
     return new Promise((resolve, reject) => {
@@ -31,7 +31,7 @@ async function runImplicitOAuth(clientId) {
             else if (token)
                 resolve(token);
             else
-                reject(new Error('OAuthからアクセストークンが返りませんでした。'));
+                reject(new Error('アクセストークンを受け取れませんでした。'));
         };
         const server = node_http_1.default.createServer((req, res) => {
             const url = new URL(req.url ?? '/', exports.OAUTH_CALLBACK_URL);
@@ -42,13 +42,14 @@ async function runImplicitOAuth(clientId) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src http://${HOST}:${PORT};">
-<title>CASPULSE OAuth</title>
+<title>CASPULSE</title>
 <style>
-body{font-family:ui-sans-serif,system-ui;background:#f6f2ff;color:#211e33;display:grid;place-items:center;min-height:100vh;margin:0}
-main{background:white;border:2px solid #211e33;border-radius:24px;padding:32px;box-shadow:9px 9px 0 #bff4f8;max-width:520px}h1{margin:0 0 12px}.muted{color:#77718a}
+body{font-family:ui-sans-serif,system-ui;background:#0d1230;color:#f7fbff;display:grid;place-items:center;min-height:100vh;margin:0}
+main{background:#17204a;border:1px solid #6adff2;border-radius:20px;padding:28px;box-shadow:0 24px 80px rgba(0,0,0,.45);max-width:520px}
+h1{margin:0 0 10px}.muted{color:#9fb0d0;font-size:14px;line-height:1.6}
 </style>
 </head>
-<body><main><h1>CASPULSE</h1><p id="status">TwitCasting認証をCASPULSEへ渡しています…</p><p class="muted">完了後、このタブを閉じてアプリへ戻ってください。</p></main>
+<body><main><h1>CASPULSE</h1><p id="status">ツイキャス連携を確認しています…</p><p class="muted">完了したら、このタブを閉じてCASPULSEへ戻ってください。</p></main>
 <script>
 (async()=>{
   const params=new URLSearchParams(location.hash.slice(1));
@@ -56,7 +57,7 @@ main{background:white;border:2px solid #211e33;border-radius:24px;padding:32px;b
   const status=document.getElementById('status');
   try{
     const response=await fetch('/oauth/token',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
-    status.textContent=response.ok?'連携完了。CASPULSEへ戻ってください。':'認証情報を確認できませんでした。';
+    status.textContent=response.ok?'連携しました。CASPULSEへ戻ってください。':'認証情報を確認できませんでした。';
   }catch{status.textContent='CASPULSEへ認証情報を渡せませんでした。';}
 })();
 </script></body></html>`;
@@ -75,12 +76,12 @@ main{background:white;border:2px solid #211e33;border-radius:24px;padding:32px;b
                         const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
                         if (body.denied) {
                             res.writeHead(200).end('ok');
-                            finish(new Error('TwitCasting連携がキャンセルされました。'));
+                            finish(new Error('ツイキャス連携をキャンセルしました。'));
                             return;
                         }
                         if (!body.token || body.state !== state) {
                             res.writeHead(400).end('invalid oauth response');
-                            finish(new Error('OAuth state検証に失敗しました。'));
+                            finish(new Error('OAuth stateの確認に失敗しました。'));
                             return;
                         }
                         res.writeHead(200).end('ok');
@@ -109,7 +110,7 @@ main{background:white;border:2px solid #211e33;border-radius:24px;padding:32px;b
             }
         });
         timeout = setTimeout(() => {
-            finish(new Error(`OAuthがタイムアウトしました。Callback URL: ${exports.OAUTH_CALLBACK_URL}`));
+            finish(new Error(`ツイキャス連携がタイムアウトしました。Callback URL: ${exports.OAUTH_CALLBACK_URL}`));
         }, 180_000);
     });
 }
