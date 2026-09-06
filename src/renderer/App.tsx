@@ -393,6 +393,17 @@ export function App() {
     });
   };
 
+  const pasteTwitCastingUrl = () => {
+    void runAction(async () => {
+      const candidate = await window.caspulse.getClipboardTwitCastingTarget();
+      if (!candidate) {
+        throw new Error('クリップボードにツイキャスの配信URLが見つからなかったよ。先に配信ページのURLをコピーしてね。');
+      }
+      setTargetInput(candidate);
+      setClipboardCandidate(null);
+    });
+  };
+
   const startRecent = (user: TrackedUser) => {
     void runAction(async () => {
       setSelectedUserId(user.userId);
@@ -456,19 +467,36 @@ export function App() {
       </header>
 
       <main className="page-wrap">
-        <section className="hero-wrap">
+        <section className={`hero-wrap ${!dashboard.tracker.isRunning ? 'start-here' : ''}`}>
+          {!dashboard.tracker.isRunning && (
+            <div className="start-guide" aria-label="CASPULSEの使い方">
+              <div className="start-guide-title"><span>START</span><b>まずはここ！ 配信URLを貼ってね 👇</b></div>
+              <div className="start-steps">
+                <span><i>1</i> ツイキャスで見たい配信を開く</span>
+                <em>→</em>
+                <span><i>2</i> URLをコピー</span>
+                <em>→</em>
+                <span className="active"><i>3</i> ここに貼る</span>
+              </div>
+            </div>
+          )}
           <form className="url-hero" onSubmit={handleTrace}>
-            <div className="url-label">🔗 <b>配信URLをぺたっ</b><span> ฅ^•ﻌ•^ฅ</span></div>
+            <div className="url-label">🔗 <b>ここに配信URLを貼ってね</b><span> ฅ^•ﻌ•^ฅ</span><small>例：twitcasting.tv/○○○</small></div>
             <div className="url-input-shell">
               <span className="link-mark">↗</span>
               <input
                 value={targetInput}
                 onChange={(event) => setTargetInput(event.target.value)}
-                placeholder={EXAMPLE_URL}
+                placeholder="https://twitcasting.tv/○○○  ← この形のURLを貼る"
                 disabled={busy}
+                autoFocus
+                aria-label="ツイキャスの配信URLを貼る欄"
                 autoComplete="off"
                 spellCheck={false}
               />
+              {!targetInput && (
+                <button type="button" className="paste-button" onClick={pasteTwitCastingUrl} disabled={busy}>📋 貼り付け</button>
+              )}
               {targetInput && <button type="button" className="clear-input" onClick={() => setTargetInput('')} aria-label="入力を消す">×</button>}
             </div>
             {dashboard.tracker.isRunning ? (
@@ -484,7 +512,7 @@ export function App() {
               </button>
             )}
           </form>
-          <div className="hero-note">推しの配信を<br /><b>つないでみよう！</b><span>↙</span></div>
+          {!dashboard.tracker.isRunning && <div className="hero-note">この白い欄だよ！<br /><b>URLをぺたっ ✦</b><span>↙</span></div>}
         </section>
 
         <div className="vibe-ribbon" aria-hidden="true">

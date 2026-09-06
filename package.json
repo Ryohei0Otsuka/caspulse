@@ -1,6 +1,6 @@
 {
   "name": "caspulse",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "A playful portable TwitCasting companion: paste a stream URL and watch comments, viewers, and momentum locally.",
   "author": "CASPULSE Project",

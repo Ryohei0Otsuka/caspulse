@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.2
+
+- Made the TwitCasting URL entry point impossible to miss.
+- Added a three-step start guide above the URL field.
+- Added a one-click clipboard paste button for TwitCasting URLs.
+- Enlarged and highlighted the URL field and primary action.
+- Added explicit example text and autofocus for first launch.
+
 ## v0.2.1
 
 - Fixed TypeScript typing for dashboard metrics and comments.
