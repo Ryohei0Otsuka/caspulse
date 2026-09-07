@@ -350,7 +350,7 @@ export class DatabaseService {
       SELECT captured_at, current_viewers, total_viewers, total_comments,
              comments_per_minute, unique_commenters, viewer_delta,
              momentum, activity_score
-      FROM metrics WHERE movie_id = ? ORDER BY captured_at DESC LIMIT 1
+      FROM metrics WHERE movie_id = ? ORDER BY captured_at DESC, id DESC LIMIT 1
     `).get(movieId) as MetricRow | undefined;
     return row ? this.mapMetric(row) : null;
   }
@@ -363,7 +363,7 @@ export class DatabaseService {
              momentum, activity_score
       FROM metrics
       WHERE movie_id = ?
-      ORDER BY captured_at DESC
+      ORDER BY captured_at DESC, id DESC
       LIMIT ?
     `).all(movieId, safeLimit) as unknown as MetricRow[];
     return rows.reverse().map((row) => this.mapMetric(row));

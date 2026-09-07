@@ -235,7 +235,9 @@ export class TrackerService extends EventEmitter {
             comment.createdAt,
           );
         }
-        this.emitUpdate(inserted, null);
+        const metric = this.liveMovie ? this.buildMetric(this.liveMovie, 'comment') : null;
+        if (metric && this.liveMovie) this.db.insertMetric(this.liveMovie.id, metric);
+        this.emitUpdate(inserted, metric);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Comment polling failed.';
@@ -250,7 +252,7 @@ export class TrackerService extends EventEmitter {
     }
   }
 
-  private buildMetric(movie: TwitCastingMovie): StreamMetric {
+  private buildMetric(movie: TwitCastingMovie, source: 'status' | 'comment' = 'status'): StreamMetric {
     const now = Math.floor(Date.now() / 1000);
     const commentsPerMinute = this.db.countCommentsSince(movie.id, now - 60);
     const uniqueCommenters = this.db.countUniqueCommentersSince(movie.id, now - 60);
@@ -258,8 +260,14 @@ export class TrackerService extends EventEmitter {
     const previous60 = this.db.countCommentsBetween(movie.id, now - 75, now - 15);
     const baseline15 = previous60 / 4;
     const previousMetric = this.db.getLatestMetric(movie.id);
-    const viewerDelta = previousMetric ? movie.current_view_count - previousMetric.currentViewers : 0;
-    const previousViewers = previousMetric?.currentViewers ?? movie.current_view_count;
+    // Viewer counts are refreshed by the slower status poll. Comment-driven metrics
+    // preserve the most recent viewer movement while updating comment activity immediately.
+    const viewerDelta = source === 'comment'
+      ? (previousMetric?.viewerDelta ?? 0)
+      : (previousMetric ? movie.current_view_count - previousMetric.currentViewers : 0);
+    const previousViewers = source === 'comment'
+      ? Math.max(0, movie.current_view_count - viewerDelta)
+      : (previousMetric?.currentViewers ?? movie.current_view_count);
     const viewerChangePercent = previousViewers > 0 ? (viewerDelta / previousViewers) * 100 : 0;
 
     // Momentum v2: low-volume streams get a gentle ramp instead of +100% per comment.

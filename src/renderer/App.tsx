@@ -206,7 +206,8 @@ export function App() {
 
     let title = '安定した流れです';
     let tone = 'steady';
-    if (latest.momentum >= 150) { title = 'コメントが急上昇しています'; tone = 'hot'; }
+    if (latest.commentsPerMinute === 0) { title = '新着コメントを待っています'; tone = 'calm'; }
+    else if (latest.momentum >= 150) { title = 'コメントが急上昇しています'; tone = 'hot'; }
     else if (latest.activityScore >= 80) { title = 'かなり活発な流れです'; tone = 'hot'; }
     else if (latest.momentum >= 60) { title = 'コメントの勢いが上がっています'; tone = 'rising'; }
     else if (latest.activityScore >= 60) { title = '盛り上がりが続いています'; tone = 'rising'; }
@@ -237,7 +238,7 @@ export function App() {
 
       <section className={`panel live-summary summary-${liveSummary.tone}`}>
         <div className="summary-copy">
-          <div className="summary-topline"><span>LIVE SUMMARY</span><b><i/> {liveSummary.status}</b></div>
+          <div className="summary-topline"><span>LIVE SUMMARY</span><b><i/> · {liveSummary.status}</b></div>
           <h2>{liveSummary.title}</h2>
           <p>{liveSummary.detail}</p>
         </div>
