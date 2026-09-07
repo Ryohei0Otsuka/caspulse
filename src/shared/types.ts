@@ -154,7 +154,6 @@ export interface CaspulseApi {
   startTrackingInput: (input: string) => Promise<StartTrackingResult>;
   stopTracking: () => Promise<TrackerStatus>;
   getDashboard: (userId?: string) => Promise<DashboardPayload>;
-  getClipboardTwitCastingTarget: () => Promise<string | null>;
   getLiveThumbnail: (userId: string) => Promise<string | null>;
   openExternal: (url: string) => Promise<void>;
   onTrackerUpdate: (listener: (update: TrackerUpdate) => void) => () => void;

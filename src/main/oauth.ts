@@ -30,21 +30,22 @@ export async function runImplicitOAuth(clientId: string): Promise<string> {
       const url = new URL(req.url ?? '/', OAUTH_CALLBACK_URL);
 
       if (req.method === 'GET' && url.pathname === '/oauth/callback') {
+        const cspNonce = randomBytes(18).toString('base64');
         const html = `<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src http://${HOST}:${PORT};">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; style-src 'nonce-${cspNonce}'; script-src 'nonce-${cspNonce}'; connect-src http://${HOST}:${PORT};">
 <title>CASPULSE</title>
-<style>
+<style nonce="${cspNonce}">
 body{font-family:ui-sans-serif,system-ui;background:#0d1230;color:#f7fbff;display:grid;place-items:center;min-height:100vh;margin:0}
 main{background:#17204a;border:1px solid #6adff2;border-radius:20px;padding:28px;box-shadow:0 24px 80px rgba(0,0,0,.45);max-width:520px}
 h1{margin:0 0 10px}.muted{color:#9fb0d0;font-size:14px;line-height:1.6}
 </style>
 </head>
 <body><main><h1>CASPULSE</h1><p id="status">ツイキャス連携を確認しています…</p><p class="muted">完了したら、このタブを閉じてCASPULSEへ戻ってください。</p></main>
-<script>
+<script nonce="${cspNonce}">
 (async()=>{
   const params=new URLSearchParams(location.hash.slice(1));
   const payload={token:params.get('access_token'),state:params.get('state'),denied:params.get('result')==='denied'};

@@ -1,5 +1,7 @@
 import path from 'node:path';
-import { app, BrowserWindow, clipboard, ipcMain, safeStorage, shell } from 'electron';
+import { fileURLToPath } from 'node:url';
+import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron';
+import type { IpcMainInvokeEvent } from 'electron';
 import type {
   CommentAuthStatus,
   DashboardPayload,
@@ -118,28 +120,74 @@ function sendTerminal(event: TerminalEvent): void {
   if (!mainWindow?.isDestroyed()) mainWindow?.webContents.send('terminal:event', event);
 }
 
-async function clipboardTwitCastingTarget(): Promise<string | null> {
-  const raw = (await clipboard.readText()).trim();
-  if (!raw || raw.length > 2048 || !/twitcasting\.tv/i.test(raw)) return null;
+function isAllowedExternalUrl(rawUrl: string): boolean {
   try {
-    return parseTwitCastingTarget(raw).originalInput;
+    const parsed = new URL(rawUrl);
+    return parsed.protocol === 'https:' && (
+      parsed.hostname === 'twitcasting.tv'
+      || parsed.hostname.endsWith('.twitcasting.tv')
+      || parsed.hostname === 'github.com'
+    );
   } catch {
-    return null;
+    return false;
   }
 }
 
-function registerIpc(): void {
-  ipcMain.handle('app:get-bootstrap', async () => buildDashboard());
-  ipcMain.handle('data:get-dashboard', async (_event, userId?: string) => buildDashboard(userId));
+function isTrustedRendererUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    const devServer = process.env.VITE_DEV_SERVER_URL;
 
-  ipcMain.handle('relay:status', async () => ({
+    if (devServer) {
+      return parsed.origin === new URL(devServer).origin;
+    }
+
+    if (parsed.protocol !== 'file:') return false;
+    const expected = path.resolve(__dirname, '../../dist/index.html');
+    const actual = path.resolve(fileURLToPath(parsed));
+    return actual === expected;
+  } catch {
+    return false;
+  }
+}
+
+function assertTrustedIpcSender(event: IpcMainInvokeEvent): void {
+  const activeWindow = mainWindow;
+  const senderUrl = event.senderFrame?.url || event.sender.getURL();
+  if (
+    !activeWindow
+    || activeWindow.isDestroyed()
+    || event.sender.id !== activeWindow.webContents.id
+    || !isTrustedRendererUrl(senderUrl)
+  ) {
+    throw new Error('Untrusted IPC sender.');
+  }
+}
+
+type SecureIpcHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown | Promise<unknown>;
+
+function secureHandle(channel: string, handler: SecureIpcHandler): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    assertTrustedIpcSender(event);
+    return handler(event, ...args);
+  });
+}
+
+function registerIpc(): void {
+  secureHandle('app:get-bootstrap', async () => buildDashboard());
+  secureHandle('data:get-dashboard', async (_event, rawUserId?: unknown) => {
+    const userId = typeof rawUserId === 'string' && rawUserId.length <= 180 ? rawUserId : undefined;
+    return buildDashboard(userId);
+  });
+
+  secureHandle('relay:status', async () => ({
     ok: await api.health(),
     baseUrl: api.getRelayBaseUrl(),
   }));
 
-  ipcMain.handle('comment-auth:get-status', async () => commentAuthStatus());
+  secureHandle('comment-auth:get-status', async () => commentAuthStatus());
 
-  ipcMain.handle('comment-auth:connect', async () => {
+  secureHandle('comment-auth:connect', async () => {
     const clientId = await api.getOAuthClientId();
     const token = await runImplicitOAuth(clientId);
     const account = await api.verifyUserToken(token);
@@ -155,7 +203,7 @@ function registerIpc(): void {
     return commentAuthStatus();
   });
 
-  ipcMain.handle('comment-auth:disconnect', async () => {
+  secureHandle('comment-auth:disconnect', async () => {
     const previous = commentAccount?.screen_id;
     clearStoredCommentAuth();
     if (previous) {
@@ -170,7 +218,7 @@ function registerIpc(): void {
     return commentAuthStatus();
   });
 
-  ipcMain.handle('comment:post', async (_event, rawMovieId: string, rawComment: string): Promise<PostCommentResult> => {
+  secureHandle('comment:post', async (_event, rawMovieId: unknown, rawComment: unknown): Promise<PostCommentResult> => {
     const movieId = String(rawMovieId ?? '').trim();
     const comment = String(rawComment ?? '').trim();
     const activeMovieId = tracker.getStatus().activeMovieId;
@@ -202,7 +250,7 @@ function registerIpc(): void {
     }
   });
 
-  ipcMain.handle('tracker:start-input', async (_event, rawInput: string): Promise<StartTrackingResult> => {
+  secureHandle('tracker:start-input', async (_event, rawInput: unknown): Promise<StartTrackingResult> => {
     const parsed = parseTwitCastingTarget(String(rawInput ?? ''));
     sendTerminal({
       id: `input-${Date.now()}`,
@@ -225,25 +273,19 @@ function registerIpc(): void {
     return { dashboard: buildDashboard(target.userId), target };
   });
 
-  ipcMain.handle('tracker:stop', async () => tracker.stop());
+  secureHandle('tracker:stop', async () => tracker.stop());
 
-  ipcMain.handle('clipboard:get-twitcasting-target', async () => await clipboardTwitCastingTarget());
 
-  ipcMain.handle('thumbnail:get-live', async (_event, userId: string) => {
+  secureHandle('thumbnail:get-live', async (_event, userId: unknown) => {
     const normalized = String(userId ?? '').trim();
     if (!normalized || normalized.length > 180) return null;
     return api.getLiveThumbnailDataUrl(normalized);
   });
 
-  ipcMain.handle('open:external', async (_event, rawUrl: string) => {
-    const parsed = new URL(String(rawUrl ?? ''));
-    const allowed = parsed.protocol === 'https:' && (
-      parsed.hostname === 'twitcasting.tv'
-      || parsed.hostname.endsWith('.twitcasting.tv')
-      || parsed.hostname === 'github.com'
-    );
-    if (!allowed) throw new Error('許可されていない外部URLです。');
-    await shell.openExternal(parsed.toString());
+  secureHandle('open:external', async (_event, rawUrl: unknown) => {
+    const url = String(rawUrl ?? '');
+    if (!isAllowedExternalUrl(url)) throw new Error('許可されていない外部URLです。');
+    await shell.openExternal(url);
   });
 }
 
@@ -260,21 +302,26 @@ async function createWindow(): Promise<void> {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      webviewTag: false,
     },
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol === 'https:' && (
-        parsed.hostname === 'twitcasting.tv'
-        || parsed.hostname.endsWith('.twitcasting.tv')
-        || parsed.hostname === 'github.com'
-      )) void shell.openExternal(parsed.toString());
-    } catch {
-      // Ignore malformed external links.
-    }
+    if (isAllowedExternalUrl(url)) void shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  const guardNavigation = (event: Electron.Event, navigationUrl: string) => {
+    if (isTrustedRendererUrl(navigationUrl)) return;
+    event.preventDefault();
+    if (isAllowedExternalUrl(navigationUrl)) void shell.openExternal(navigationUrl);
+  };
+  mainWindow.webContents.on('will-navigate', guardNavigation);
+  mainWindow.webContents.on('will-redirect', guardNavigation);
+  mainWindow.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
   });
 
   const devServer = process.env.VITE_DEV_SERVER_URL;

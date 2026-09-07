@@ -11,7 +11,6 @@ const api: CaspulseApi = {
   startTrackingInput: (input) => ipcRenderer.invoke('tracker:start-input', input),
   stopTracking: () => ipcRenderer.invoke('tracker:stop'),
   getDashboard: (userId) => ipcRenderer.invoke('data:get-dashboard', userId),
-  getClipboardTwitCastingTarget: () => ipcRenderer.invoke('clipboard:get-twitcasting-target'),
   getLiveThumbnail: (userId) => ipcRenderer.invoke('thumbnail:get-live', userId),
   openExternal: (url) => ipcRenderer.invoke('open:external', url),
   onTrackerUpdate: (listener) => {
