@@ -104,9 +104,9 @@ export function App() {
   };
 
   useEffect(() => {
-    void Promise.all([window.caspulse.getBootstrap(), window.caspulse.getRelayStatus(), window.caspulse.getCommentAuthStatus(), window.caspulse.getClipboardTwitCastingTarget()])
-      .then(([data, relay, auth, clip]) => {
-        setDashboard(data); setSelectedUserId(data.selectedUser?.userId ?? null); setRelayOnline(relay.ok); setCommentAuth(auth); if (clip) setTargetInput(clip);
+    void Promise.all([window.caspulse.getBootstrap(), window.caspulse.getRelayStatus(), window.caspulse.getCommentAuthStatus()])
+      .then(([data, relay, auth]) => {
+        setDashboard(data); setSelectedUserId(data.selectedUser?.userId ?? null); setRelayOnline(relay.ok); setCommentAuth(auth);
       }).catch(e => setError(e instanceof Error ? e.message : String(e)));
     const offTracker = window.caspulse.onTrackerUpdate((update: TrackerUpdate) => {
       setDashboard(current => {
@@ -190,10 +190,35 @@ export function App() {
     setDashboard(current=>({ ...emptyDashboard, auth: current.auth, tracker }));
   });
 
-  const atmosphere = useMemo(() => {
-    if (!live) return dashboard.tracker.isRunning ? '現在はオフラインです。次の配信を待機しています。' : '配信URLを入力すると、コメントと盛り上がりを表示します。';
-    if (!latest) return '配信に接続しました。データを取得しています。';
-    return `${activityText(latest.activityScore)}。${latest.commentsPerMinute}コメ/分、勢い ${latest.momentum>=0?'+':''}${latest.momentum}%。`;
+  const liveSummary = useMemo(() => {
+    if (!dashboard.tracker.isRunning) return {
+      tone: 'idle', status: '待機中', title: '配信URLを入力してください',
+      detail: '接続すると、コメント・視聴者数・勢い・盛り上がりをここでまとめて確認できます。',
+    };
+    if (!live) return {
+      tone: 'offline', status: 'OFFLINE', title: '現在はオフラインです',
+      detail: '配信開始を待機しています。接続は維持したまま、自動で状態を確認します。',
+    };
+    if (!latest) return {
+      tone: 'loading', status: '取得中', title: '配信に接続しました',
+      detail: 'コメントと視聴者データを集めています。もう少しすると配信の流れが見えてきます。',
+    };
+
+    let title = '安定した流れです';
+    let tone = 'steady';
+    if (latest.momentum >= 150) { title = 'コメントが急上昇しています'; tone = 'hot'; }
+    else if (latest.activityScore >= 80) { title = 'かなり活発な流れです'; tone = 'hot'; }
+    else if (latest.momentum >= 60) { title = 'コメントの勢いが上がっています'; tone = 'rising'; }
+    else if (latest.activityScore >= 60) { title = '盛り上がりが続いています'; tone = 'rising'; }
+    else if (latest.activityScore < 15) { title = '落ち着いた流れです'; tone = 'calm'; }
+
+    const viewerMove = latest.viewerDelta === 0
+      ? '視聴者数はほぼ横ばい'
+      : `視聴者は直近で${latest.viewerDelta > 0 ? '+' : ''}${latest.viewerDelta}`;
+    return {
+      tone, status: 'LIVE', title,
+      detail: `${latest.commentsPerMinute}コメ/分、${latest.uniqueCommenters}人が参加。${viewerMove}、勢いは${latest.momentum >= 0 ? '+' : ''}${latest.momentum}%です。`,
+    };
   }, [live, latest, dashboard.tracker.isRunning]);
 
   return <div className="app-shell">
@@ -204,12 +229,20 @@ export function App() {
 
     <main className="workspace">
       <form className={`connect-strip ${dashboard.tracker.isRunning?'connected':''}`} onSubmit={handleTrace}>
-        <label>配信URL</label><input value={targetInput} onChange={e=>setTargetInput(e.target.value)} placeholder="https://twitcasting.tv/xxxxx" autoFocus={!dashboard.tracker.isRunning}/>
-        <button type="button" className="ghost" onClick={()=>void run(async()=>{ const v=await window.caspulse.getClipboardTwitCastingTarget(); if(!v) throw new Error('クリップボードにツイキャスURLがありません。'); setTargetInput(v); })}>貼り付け</button>
+        <label>配信URL</label><input value={targetInput} onChange={e=>setTargetInput(e.target.value)} placeholder="ツイキャスの配信URLを Ctrl+V で貼り付け" autoFocus={!dashboard.tracker.isRunning}/>
         <button type="submit" className="primary" disabled={busy || !targetInput.trim()}>{dashboard.tracker.isRunning?'切り替える':'視聴しに行く！'}</button>
         {dashboard.tracker.isRunning && <button type="button" className="stop" title="配信との接続を終了します" onClick={disconnectStream}>切断</button>}
       </form>
       {error && <div className="error-bar"><span>!</span>{error}<button onClick={()=>setError(null)}>×</button></div>}
+
+      <section className={`panel live-summary summary-${liveSummary.tone}`}>
+        <div className="summary-copy">
+          <div className="summary-topline"><span>LIVE SUMMARY</span><b><i/> {liveSummary.status}</b></div>
+          <h2>{liveSummary.title}</h2>
+          <p>{liveSummary.detail}</p>
+        </div>
+        {latest && <div className="summary-score"><span>盛り上がり</span><strong>{latest.activityScore}</strong><small>{activityText(latest.activityScore)}</small></div>}
+      </section>
 
       <section className="dense-grid">
         <aside className="left-column">
@@ -239,7 +272,6 @@ export function App() {
         </section>
 
         <aside className="right-column">
-          <article className="panel mood-panel"><div className="panel-head"><div><span>NOW</span><h3>配信の様子</h3></div><small>BETA</small></div><p className="mood-main">{atmosphere}</p>{latest&&<div className="mood-grid"><span>視聴者 <b>{latest.currentViewers}</b></span><span>参加 <b>{latest.uniqueCommenters}人</b></span><span>勢い <b>{latest.momentum>=0?'+':''}{latest.momentum}%</b></span><span>スコア <b>{latest.activityScore}</b></span></div>}</article>
           <article className="panel terminal-panel"><div className="panel-head"><div><span>LOG</span><h3>ライブログ</h3></div><button onClick={()=>setTerminal([])}>クリア</button></div><div className="terminal-scroll">{terminal.length?terminal.slice(-80).map(line=><div className={`terminal-line kind-${line.kind}`} key={line.id}><time>{formatTime(line.at,true)}</time><b>[{friendlyLabel(line.label)}]</b><span>{line.message}</span></div>):<p className="empty-small">接続待機中。</p>}<div ref={terminalEnd}/></div></article>
         </aside>
       </section>
