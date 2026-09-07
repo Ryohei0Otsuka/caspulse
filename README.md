@@ -4,9 +4,11 @@
 
 CASPULSE は、配信URLを貼るだけでコメント・視聴者数・勢い・盛り上がりを確認できる **Windows向けポータブルアプリ** です。
 
+![CASPULSE](docs/images/caspulse-main.png)
+
 ## ✦ 使い方
 
-1. Releases から Windows版ZIPをダウンロード
+1. [Releases](../../releases) から Windows版ZIPをダウンロード
 2. ZIPを解凍して `CASPULSE.exe` を起動
 3. ツイキャスの配信URLを貼って **「視聴しに行く！」**
 
