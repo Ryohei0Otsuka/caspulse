@@ -21,12 +21,12 @@
     "clean:portable-artifacts": "powershell -NoProfile -Command \"Get-ChildItem -Path release -Exclude CASPULSE.exe -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue\""
   },
   "dependencies": {
-    "react": "19.2.8",
+    "react": "19.3.0",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@types/node": "24.3.0",
-    "@types/react": "19.1.10",
+    "@types/react": "19.3.0",
     "@types/react-dom": "19.1.7",
     "@vitejs/plugin-react": "6.1.1",
     "concurrently": "9.2.1",
